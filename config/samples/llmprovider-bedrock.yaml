@@ -1,0 +1,18 @@
+apiVersion: llmwarden.io/v1alpha1
+kind: LLMProvider
+metadata:
+  name: bedrock-production
+spec:
+  provider: aws-bedrock
+  auth:
+    type: workloadIdentity
+    workloadIdentity:
+      aws:
+        roleArn: arn:aws:iam::123456789012:role/bedrock-prod
+        region: us-east-1
+  allowedModels:
+    - "anthropic.claude-sonnet-4-20250514"
+    - "amazon.titan-embed-text-v2"
+  namespaceSelector:
+    matchLabels:
+      ai-tier: production

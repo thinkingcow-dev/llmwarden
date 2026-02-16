@@ -1,0 +1,30 @@
+apiVersion: v2
+name: llmwarden
+description: A Kubernetes operator that makes LLM provider access declarative, secretless, and auditable
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - llm
+  - ai
+  - credentials
+  - operator
+  - openai
+  - anthropic
+  - bedrock
+home: https://github.com/tpbansal/llmwarden
+sources:
+  - https://github.com/tpbansal/llmwarden
+maintainers:
+  - name: llmwarden maintainers
+    email: maintainers@llmwarden.io
+icon: https://raw.githubusercontent.com/tpbansal/llmwarden/main/docs/logo.png
+kubeVersion: ">=1.25.0-0"
+annotations:
+  # Artifact Hub metadata
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/operator: "true"
+  artifacthub.io/operatorCapabilities: Full Lifecycle
+  artifacthub.io/signKey: ""
+  artifacthub.io/prerelease: "true"

@@ -1,0 +1,33 @@
+{{- if and .Values.webhook.enabled .Values.webhook.llmaccess.enabled -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "llmwarden.fullname" . }}-validating
+  labels:
+    {{- include "llmwarden.labels" . | nindent 4 }}
+  {{- if .Values.webhook.certificate.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "llmwarden.certificateName" . }}
+  {{- end }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "llmwarden.webhookServiceName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-llmwarden-io-v1alpha1-llmaccess
+  failurePolicy: {{ .Values.webhook.llmaccess.failurePolicy }}
+  name: vllmaccess-v1alpha1.llmwarden.io
+  rules:
+  - apiGroups:
+    - llmwarden.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - llmaccesses
+  sideEffects: None
+{{- end }}

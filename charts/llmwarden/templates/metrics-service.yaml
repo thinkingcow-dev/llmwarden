@@ -1,0 +1,22 @@
+{{- if .Values.metrics.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llmwarden.metricsServiceName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "llmwarden.labels" . | nindent 4 }}
+  {{- with .Values.metrics.serviceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+  - name: https
+    port: {{ .Values.service.metricsPort }}
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    {{- include "llmwarden.selectorLabels" . | nindent 4 }}
+{{- end }}

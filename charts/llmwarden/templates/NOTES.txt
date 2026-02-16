@@ -1,0 +1,78 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named {{ .Release.Name }}.
+
+llmwarden is a Kubernetes operator that makes LLM provider access declarative, secretless, and auditable.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{- if .Values.webhook.enabled }}
+
+Webhooks are enabled. To verify webhook configuration:
+
+  $ kubectl get mutatingwebhookconfigurations {{ include "llmwarden.fullname" . }}-mutating
+  {{- if .Values.webhook.llmaccess.enabled }}
+  $ kubectl get validatingwebhookconfigurations {{ include "llmwarden.fullname" . }}-validating
+  {{- end }}
+
+{{- if .Values.webhook.certificate.enabled }}
+Certificate management is handled by cert-manager.
+{{- end }}
+{{- end }}
+
+{{- if .Values.metrics.serviceMonitor.enabled }}
+
+Prometheus ServiceMonitor is enabled for metrics collection.
+{{- end }}
+
+Get started by creating an LLMProvider:
+
+  $ kubectl apply -f - <<EOF
+  apiVersion: llmwarden.io/v1alpha1
+  kind: LLMProvider
+  metadata:
+    name: openai-production
+  spec:
+    provider: openai
+    auth:
+      type: apiKey
+      apiKey:
+        secretRef:
+          name: openai-api-key
+          namespace: {{ .Release.Namespace }}
+          key: api-key
+    allowedModels:
+      - gpt-4o
+      - gpt-4o-mini
+  EOF
+
+Then create an LLMAccess in your application namespace:
+
+  $ kubectl apply -f - <<EOF
+  apiVersion: llmwarden.io/v1alpha1
+  kind: LLMAccess
+  metadata:
+    name: my-app-openai
+    namespace: my-app
+  spec:
+    providerRef:
+      name: openai-production
+    models:
+      - gpt-4o
+    secretName: openai-credentials
+    workloadSelector:
+      matchLabels:
+        app: my-app
+    injection:
+      env:
+        - name: OPENAI_API_KEY
+          secretKey: apiKey
+  EOF
+
+For more information, visit:
+{{ .Chart.Home }}
+
+Documentation: https://github.com/tpbansal/llmwarden/tree/main/docs

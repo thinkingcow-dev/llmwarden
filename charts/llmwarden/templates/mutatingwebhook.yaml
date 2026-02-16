@@ -1,0 +1,54 @@
+{{- if .Values.webhook.enabled -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "llmwarden.fullname" . }}-mutating
+  labels:
+    {{- include "llmwarden.labels" . | nindent 4 }}
+  {{- if .Values.webhook.certificate.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "llmwarden.certificateName" . }}
+  {{- end }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "llmwarden.webhookServiceName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-llmwarden-io-v1alpha1-llmaccess
+  failurePolicy: Fail
+  name: mllmaccess-v1alpha1.llmwarden.io
+  rules:
+  - apiGroups:
+    - llmwarden.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - llmaccesses
+  sideEffects: None
+{{- if .Values.webhook.pod.enabled }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "llmwarden.webhookServiceName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1-pod
+  failurePolicy: {{ .Values.webhook.pod.failurePolicy }}
+  name: mpod.llmwarden.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None
+{{- end }}
+{{- end }}

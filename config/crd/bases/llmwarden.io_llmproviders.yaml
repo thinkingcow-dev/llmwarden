@@ -1,0 +1,403 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.0
+  name: llmproviders.llmwarden.io
+spec:
+  group: llmwarden.io
+  names:
+    kind: LLMProvider
+    listKind: LLMProviderList
+    plural: llmproviders
+    shortNames:
+    - llmp
+    singular: llmprovider
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.provider
+      name: Provider
+      type: string
+    - jsonPath: .spec.auth.type
+      name: Auth Type
+      type: string
+    - jsonPath: .status.accessCount
+      name: Access Count
+      type: integer
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          LLMProvider is the Schema for the llmproviders API.
+          It declares an available LLM provider and its authentication configuration.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of LLMProvider
+            properties:
+              allowedModels:
+                description: |-
+                  AllowedModels is a list of model names/IDs that can be accessed through this provider.
+                  Empty list means all models are allowed.
+                items:
+                  type: string
+                type: array
+              auth:
+                description: Auth defines the authentication strategy for accessing
+                  the LLM provider
+                properties:
+                  apiKey:
+                    description: |-
+                      APIKey configuration for direct API key authentication
+                      Required when type is "apiKey"
+                    properties:
+                      rotation:
+                        description: Rotation defines credential rotation policy
+                        properties:
+                          enabled:
+                            default: false
+                            description: Enabled determines whether automatic rotation
+                              is enabled
+                            type: boolean
+                          interval:
+                            description: Interval is the duration between credential
+                              rotations (e.g., "30d", "7d")
+                            pattern: ^\d+[dhm]$
+                            type: string
+                          strategy:
+                            default: providerAPI
+                            description: Strategy defines how rotation is performed
+                            enum:
+                            - providerAPI
+                            - recreateSecret
+                            type: string
+                        required:
+                        - enabled
+                        type: object
+                      secretRef:
+                        description: SecretRef references an existing Kubernetes Secret
+                          containing the API key
+                        properties:
+                          key:
+                            description: Key within the secret that contains the API
+                              key
+                            type: string
+                          name:
+                            description: Name of the secret
+                            type: string
+                          namespace:
+                            description: Namespace of the secret
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                    required:
+                    - secretRef
+                    type: object
+                  externalSecret:
+                    description: |-
+                      ExternalSecret configuration for External Secrets Operator integration
+                      Required when type is "externalSecret"
+                    properties:
+                      refreshInterval:
+                        default: 1h
+                        description: RefreshInterval is how often to check for secret
+                          updates
+                        pattern: ^\d+[hms]$
+                        type: string
+                      remoteRef:
+                        description: RemoteRef defines the reference to the secret
+                          in the external store
+                        properties:
+                          key:
+                            description: Key is the key/path to the secret in the
+                              external store
+                            type: string
+                          property:
+                            description: Property is the property/field within the
+                              secret to use
+                            type: string
+                        required:
+                        - key
+                        type: object
+                      store:
+                        description: Store references the SecretStore or ClusterSecretStore
+                        properties:
+                          kind:
+                            description: Kind of the store (SecretStore or ClusterSecretStore)
+                            enum:
+                            - SecretStore
+                            - ClusterSecretStore
+                            type: string
+                          name:
+                            description: Name of the SecretStore/ClusterSecretStore
+                            type: string
+                        required:
+                        - kind
+                        - name
+                        type: object
+                    required:
+                    - remoteRef
+                    - store
+                    type: object
+                  type:
+                    description: Type specifies the authentication strategy to use
+                    enum:
+                    - apiKey
+                    - externalSecret
+                    - workloadIdentity
+                    type: string
+                  workloadIdentity:
+                    description: |-
+                      WorkloadIdentity configuration for cloud-native secretless auth
+                      Required when type is "workloadIdentity"
+                    properties:
+                      aws:
+                        description: AWS configuration for IRSA (IAM Roles for Service
+                          Accounts)
+                        properties:
+                          region:
+                            description: Region is the AWS region
+                            type: string
+                          roleArn:
+                            description: RoleArn is the ARN of the IAM role to assume
+                            pattern: ^arn:aws:iam::\d{12}:role/.*$
+                            type: string
+                        required:
+                        - region
+                        - roleArn
+                        type: object
+                      azure:
+                        description: Azure configuration for Azure Workload Identity
+                        properties:
+                          clientId:
+                            description: ClientId is the Azure AD application client
+                              ID
+                            type: string
+                          managedIdentityResourceId:
+                            description: ManagedIdentityResourceId is the resource
+                              ID of the managed identity (for user-assigned)
+                            type: string
+                          tenantId:
+                            description: TenantId is the Azure AD tenant ID
+                            type: string
+                        required:
+                        - clientId
+                        - tenantId
+                        type: object
+                      gcp:
+                        description: GCP configuration for Workload Identity Federation
+                        properties:
+                          projectId:
+                            description: ProjectId is the GCP project ID
+                            type: string
+                          serviceAccountEmail:
+                            description: ServiceAccountEmail is the GCP service account
+                              email
+                            type: string
+                        required:
+                        - projectId
+                        - serviceAccountEmail
+                        type: object
+                    type: object
+                required:
+                - type
+                type: object
+              endpoint:
+                description: |-
+                  Endpoint allows overriding the provider's default endpoint
+                  (e.g., for proxies or private endpoints)
+                properties:
+                  baseURL:
+                    description: |-
+                      BaseURL is the base URL for the provider API
+                      Empty string means use provider default
+                    type: string
+                type: object
+              namespaceSelector:
+                description: |-
+                  NamespaceSelector determines which namespaces can create LLMAccess resources
+                  referencing this provider. Empty selector means all namespaces are allowed.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              provider:
+                description: Provider specifies which LLM provider this configuration
+                  is for
+                enum:
+                - openai
+                - anthropic
+                - aws-bedrock
+                - azure-openai
+                - gcp-vertexai
+                - custom
+                type: string
+              rateLimit:
+                description: RateLimit defines rate limiting configuration (informational/enforced
+                  by webhook)
+                properties:
+                  requestsPerMinute:
+                    description: RequestsPerMinute is the max number of requests per
+                      minute
+                    format: int64
+                    minimum: 0
+                    type: integer
+                  tokensPerMinute:
+                    description: TokensPerMinute is the max number of tokens per minute
+                    format: int64
+                    minimum: 0
+                    type: integer
+                type: object
+            required:
+            - auth
+            - provider
+            type: object
+          status:
+            description: status defines the observed state of LLMProvider
+            properties:
+              accessCount:
+                description: AccessCount is the number of LLMAccess resources referencing
+                  this provider
+                format: int32
+                type: integer
+              conditions:
+                description: Conditions represent the current state of the LLMProvider
+                  resource
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastCredentialCheck:
+                description: LastCredentialCheck is the timestamp of the last credential
+                  validation check
+                format: date-time
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

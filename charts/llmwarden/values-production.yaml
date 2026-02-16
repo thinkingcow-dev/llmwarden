@@ -1,0 +1,83 @@
+# Production values for llmwarden
+# Example configuration for production deployment
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/tpbansal/llmwarden
+  pullPolicy: IfNotPresent
+  tag: "v0.1.0"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Enable leader election for HA
+controller:
+  leaderElection:
+    enabled: true
+
+# Webhook configuration with cert-manager
+webhook:
+  enabled: true
+  certificate:
+    enabled: true
+    issuer: "letsencrypt-prod"  # Must exist in cluster
+    issuerKind: ClusterIssuer
+  pod:
+    enabled: true
+    failurePolicy: Ignore
+  llmaccess:
+    enabled: true
+    failurePolicy: Fail
+
+# Enable Prometheus monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      prometheus: kube-prometheus
+
+# Node affinity for production workloads
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+          - amd64
+          - arm64
+
+# Pod disruption budget friendly configuration
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: llmwarden
+        app.kubernetes.io/instance: llmwarden
+
+# Production logging
+logging:
+  level: info
+  format: json
+  development: false
+
+# Common labels for all resources
+commonLabels:
+  environment: production
+  team: platform

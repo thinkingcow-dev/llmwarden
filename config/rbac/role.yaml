@@ -1,0 +1,85 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - llmwarden.io
+  resources:
+  - llmaccesses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - llmwarden.io
+  resources:
+  - llmaccesses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - llmwarden.io
+  resources:
+  - llmaccesses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - llmwarden.io
+  resources:
+  - llmproviders
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - llmwarden.llmwarden.io
+  resources:
+  - llmproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - llmwarden.llmwarden.io
+  resources:
+  - llmproviders/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - llmwarden.llmwarden.io
+  resources:
+  - llmproviders/status
+  verbs:
+  - get
+  - patch
+  - update

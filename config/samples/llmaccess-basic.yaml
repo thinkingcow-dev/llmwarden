@@ -1,0 +1,18 @@
+apiVersion: llmwarden.io/v1alpha1
+kind: LLMAccess
+metadata:
+  name: chatbot-openai
+  namespace: customer-facing
+spec:
+  providerRef:
+    name: openai-production
+  models:
+    - "gpt-4o"
+  secretName: openai-credentials
+  workloadSelector:
+    matchLabels:
+      app: chatbot-api
+  injection:
+    env:
+      - name: OPENAI_API_KEY
+        secretKey: apiKey

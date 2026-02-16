@@ -1,0 +1,217 @@
+# Default values for llmwarden.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Number of replicas for the controller
+replicaCount: 1
+
+image:
+  # -- Image repository
+  repository: ghcr.io/tpbansal/llmwarden
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Override the name of the chart
+nameOverride: ""
+# -- Override the full name of the release
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Automatically mount a ServiceAccount's API credentials
+  automount: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# -- Pod annotations
+podAnnotations: {}
+# -- Pod labels
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - "ALL"
+
+service:
+  # -- Service type
+  type: ClusterIP
+  # -- Service port for webhooks
+  port: 443
+  # -- Metrics service port
+  metricsPort: 8443
+
+# -- Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8081
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# -- Node selector for pod assignment
+nodeSelector: {}
+
+# -- Tolerations for pod assignment
+tolerations: []
+
+# -- Affinity for pod assignment
+affinity: {}
+
+# -- Priority class name
+priorityClassName: ""
+
+# -- Topology spread constraints
+topologySpreadConstraints: []
+
+# -- Volume mounts for the controller container
+volumeMounts: []
+# -- Volumes for the controller pod
+volumes: []
+
+# -- Additional environment variables
+env: []
+
+# -- Additional environment variables from ConfigMaps or Secrets
+envFrom: []
+
+controller:
+  # -- Enable leader election for high availability
+  leaderElection:
+    enabled: true
+  # -- Health probe bind address
+  healthProbeBindAddress: ":8081"
+  # -- Metrics bind address
+  metricsBindAddress: ":8080"
+
+rbac:
+  # -- Specifies whether RBAC resources should be created
+  create: true
+
+# Webhook configuration
+webhook:
+  # -- Enable webhook
+  enabled: true
+  # -- Webhook service name
+  service:
+    # -- Service type for webhook
+    type: ClusterIP
+    # -- Service port
+    port: 443
+    # -- Service annotations
+    annotations: {}
+  # -- Certificate configuration
+  certificate:
+    # -- Use cert-manager to generate certificates
+    enabled: true
+    # -- Certificate issuer name (must exist in cluster)
+    issuer: ""
+    # -- Certificate issuer kind (Issuer or ClusterIssuer)
+    issuerKind: ClusterIssuer
+    # -- Certificate duration
+    duration: 8760h # 1 year
+    # -- Certificate renewal before expiration
+    renewBefore: 720h # 30 days
+  # -- Pod webhook configuration
+  pod:
+    # -- Enable pod mutation webhook for credential injection
+    enabled: true
+    # -- Failure policy for pod webhook (Ignore or Fail)
+    failurePolicy: Ignore
+  # -- LLMAccess validation webhook
+  llmaccess:
+    # -- Enable LLMAccess validation webhook
+    enabled: true
+    # -- Failure policy for LLMAccess webhook
+    failurePolicy: Fail
+
+# CRD configuration
+crds:
+  # -- Install CRDs as part of the chart installation
+  install: true
+  # -- Keep CRDs on chart uninstall
+  keep: true
+  # -- Annotations to add to CRDs
+  annotations: {}
+
+# Metrics and monitoring
+metrics:
+  # -- Enable metrics service
+  enabled: true
+  # -- Service annotations for metrics
+  serviceAnnotations: {}
+  serviceMonitor:
+    # -- Create ServiceMonitor resource for Prometheus Operator
+    enabled: false
+    # -- ServiceMonitor namespace (defaults to release namespace)
+    namespace: ""
+    # -- ServiceMonitor labels
+    additionalLabels: {}
+    # -- ServiceMonitor annotations
+    annotations: {}
+    # -- Scrape interval
+    interval: 30s
+    # -- Scrape timeout
+    scrapeTimeout: 10s
+    # -- Metric relabel configs
+    metricRelabelings: []
+    # -- Relabel configs
+    relabelings: []
+
+# Leader election configuration
+leaderElection:
+  # -- Leader election resource name
+  resourceName: llmwarden-leader-election
+  # -- Leader election resource namespace (defaults to release namespace)
+  resourceNamespace: ""
+
+# External Secrets Operator integration
+externalSecrets:
+  # -- Watch for ExternalSecret resources
+  enabled: false
+
+# Logging configuration
+logging:
+  # -- Log level (debug, info, warn, error)
+  level: info
+  # -- Log format (json or console)
+  format: json
+  # -- Enable development mode logging
+  development: false
+
+# Global labels to apply to all resources
+commonLabels: {}
+
+# Global annotations to apply to all resources
+commonAnnotations: {}
