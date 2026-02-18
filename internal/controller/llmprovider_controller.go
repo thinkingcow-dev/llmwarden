@@ -20,9 +20,11 @@ import (
 	"context"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,7 +36,8 @@ import (
 // LLMProviderReconciler reconciles a LLMProvider object
 type LLMProviderReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders,verbs=get;list;watch;create;update;patch;delete
@@ -65,9 +68,13 @@ func (r *LLMProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if healthStatus == "healthy" {
 		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(1)
 		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(0)
+		r.Recorder.Event(provider, corev1.EventTypeNormal, "ProviderHealthy",
+			"LLM provider is healthy and ready")
 	} else {
 		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(0)
 		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(1)
+		r.Recorder.Event(provider, corev1.EventTypeWarning, "ProviderUnhealthy",
+			"LLM provider health check failed")
 	}
 
 	// Count LLMAccess resources that reference this provider

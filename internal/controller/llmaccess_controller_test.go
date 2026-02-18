@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
@@ -52,8 +53,9 @@ var _ = Describe("LLMAccess Controller", func() {
 		BeforeEach(func() {
 			ctx = context.Background()
 			controllerReconciler = &LLMAccessReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				Recorder: record.NewFakeRecorder(100),
 			}
 
 			// Create provider namespace

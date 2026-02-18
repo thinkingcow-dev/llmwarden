@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -61,7 +62,8 @@ const (
 // LLMAccessReconciler reconciles a LLMAccess object
 type LLMAccessReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmaccesses,verbs=get;list;watch;create;update;patch;delete
@@ -118,6 +120,8 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.Get(ctx, providerKey, provider); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Error(err, "Referenced LLMProvider not found", "provider", llmAccess.Spec.ProviderRef.Name)
+			r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonProviderNotFound,
+				fmt.Sprintf("LLMProvider %s not found", llmAccess.Spec.ProviderRef.Name))
 			r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonProviderNotFound,
 				fmt.Sprintf("LLMProvider %s not found", llmAccess.Spec.ProviderRef.Name))
 			if err := r.Status().Update(ctx, llmAccess); err != nil {
@@ -131,6 +135,8 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Validate namespace is allowed
 	if !r.isNamespaceAllowed(llmAccess.Namespace, provider) {
 		log.Info("Namespace not allowed by provider", "namespace", llmAccess.Namespace, "provider", provider.Name)
+		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonNamespaceNotAllowed,
+			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonNamespaceNotAllowed,
 			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
@@ -146,6 +152,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Validate requested models
 	if err := r.validateModels(llmAccess.Spec.Models, provider); err != nil {
 		log.Error(err, "Model validation failed")
+		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonModelNotAllowed, err.Error())
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonModelNotAllowed, err.Error())
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
@@ -168,6 +175,8 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Provision credentials (copy secret from provider namespace to access namespace)
 	if err := r.provisionAPIKeySecret(ctx, llmAccess, provider); err != nil {
 		log.Error(err, "Failed to provision secret")
+		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonSecretUpdateFailed,
+			fmt.Sprintf("Failed to provision credentials: %v", err))
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonReconciliationError,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
 		r.setCondition(llmAccess, ConditionTypeCredentialProvisioned, metav1.ConditionFalse, ReasonSecretUpdateFailed, err.Error())
@@ -207,6 +216,10 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		metrics.ReconciliationDuration.WithLabelValues("llmaccess", "error").Observe(time.Since(startTime).Seconds())
 		return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 	}
+
+	// Emit success event
+	r.Recorder.Event(llmAccess, corev1.EventTypeNormal, ReasonCredentialProvisioned,
+		fmt.Sprintf("Successfully provisioned credentials for provider %s", provider.Name))
 
 	// Update metrics for successful reconciliation
 	metrics.SecretProvisioningTotal.WithLabelValues(provider.Name, llmAccess.Namespace, "success").Inc()

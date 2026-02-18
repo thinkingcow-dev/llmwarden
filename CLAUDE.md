@@ -159,14 +159,14 @@ llmwarden/
 ## Phase Plan
 
 ### Phase 1: MVP (current target)
-- [ ] Kubebuilder scaffold with LLMProvider + LLMAccess CRDs
-- [ ] LLMProvider controller (validation, status)
-- [ ] LLMAccess controller with `apiKey` strategy (creates K8s Secret from inline secretRef)
-- [ ] Basic mutating webhook (inject env vars into matching pods)
-- [ ] Status conditions, events, basic metrics
-- [ ] Makefile, Dockerfile, basic Helm chart
-- [ ] Unit + integration tests with envtest
-- [ ] README with getting-started guide
+- [x] Kubebuilder scaffold with LLMProvider + LLMAccess CRDs
+- [x] LLMProvider controller (validation, status)
+- [x] LLMAccess controller with `apiKey` strategy (creates K8s Secret from inline secretRef)
+- [x] Basic mutating webhook (inject env vars into matching pods)
+- [x] Status conditions, events, basic metrics
+- [x] Makefile, Dockerfile, basic Helm chart
+- [x] Unit + integration tests with envtest
+- [x] README with getting-started guide
 
 ### Phase 2: ESO Integration
 - [ ] ExternalSecret provisioner (creates ESO ExternalSecret CRs)
