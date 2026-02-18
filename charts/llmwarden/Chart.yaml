@@ -12,13 +12,13 @@ keywords:
   - openai
   - anthropic
   - bedrock
-home: https://github.com/tpbansal/llmwarden
+home: https://github.com/thinkingcow-dev/llmwarden
 sources:
-  - https://github.com/tpbansal/llmwarden
+  - https://github.com/thinkingcow-dev/llmwarden
 maintainers:
   - name: llmwarden maintainers
     email: maintainers@llmwarden.io
-icon: https://raw.githubusercontent.com/tpbansal/llmwarden/main/docs/logo.png
+icon: https://raw.githubusercontent.com/thinkingcow-dev/llmwarden/main/docs/images/logo.png
 kubeVersion: ">=1.25.0-0"
 annotations:
   # Artifact Hub metadata

@@ -580,10 +580,7 @@ func TestPodInjector_injectEnvVars(t *testing.T) {
 	}
 
 	injector := &PodInjector{}
-	err := injector.injectEnvVars(pod, llmAccess)
-	if err != nil {
-		t.Fatalf("injectEnvVars() error = %v", err)
-	}
+	injector.injectEnvVars(pod, llmAccess)
 
 	// Verify containers have env vars
 	if len(pod.Spec.Containers[0].Env) != 2 {
@@ -641,10 +638,7 @@ func TestPodInjector_injectVolume(t *testing.T) {
 	}
 
 	injector := &PodInjector{}
-	err := injector.injectVolume(pod, llmAccess)
-	if err != nil {
-		t.Fatalf("injectVolume() error = %v", err)
-	}
+	injector.injectVolume(pod, llmAccess)
 
 	// Verify volume was added
 	if len(pod.Spec.Volumes) != 1 {

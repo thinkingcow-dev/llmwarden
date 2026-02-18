@@ -183,7 +183,7 @@ func main() {
 	if err := (&controller.LLMProviderReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("llmprovider-controller"),
+		Recorder: mgr.GetEventRecorderFor("llmprovider-controller"), //nolint:staticcheck // Using legacy events API for compatibility
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMProvider")
 		os.Exit(1)
@@ -191,7 +191,7 @@ func main() {
 	if err := (&controller.LLMAccessReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("llmaccess-controller"),
+		Recorder: mgr.GetEventRecorderFor("llmaccess-controller"), //nolint:staticcheck // Using legacy events API for compatibility
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMAccess")
 		os.Exit(1)

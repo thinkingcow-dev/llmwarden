@@ -211,11 +211,11 @@ make test              # Unit + integration
 make test-e2e          # E2E with chainsaw
 
 # Build
-make docker-build IMG=ghcr.io/yourusername/llmwarden:latest
-make docker-push IMG=ghcr.io/yourusername/llmwarden:latest
+make docker-build IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
+make docker-push IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
 
 # Deploy
-make deploy IMG=ghcr.io/yourusername/llmwarden:latest
+make deploy IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
 
 # Helm
 helm install llmwarden charts/llmwarden -n llmwarden-system --create-namespace
@@ -226,5 +226,5 @@ helm install llmwarden charts/llmwarden -n llmwarden-system --create-namespace
 - Kubebuilder book: https://book.kubebuilder.io/
 - controller-runtime: https://pkg.go.dev/sigs.k8s.io/controller-runtime
 - External Secrets Operator: https://external-secrets.io/
-- OpenAI Admin API: https://platform.openai.com/docs/api-reference/admin
+- OpenAI Admin API: https://platform.openai.com/docs/api-reference/administration
 - cert-manager architecture (inspiration): https://cert-manager.io/docs/concepts/

@@ -624,6 +624,6 @@ kubectl delete namespace llmwarden-system
 
 ## Getting Help
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/llmwarden/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/llmwarden/discussions)
+- **Issues:** [GitHub Issues](https://github.com/thinkingcow-dev/llmwarden/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/thinkingcow-dev/llmwarden/discussions)
 - **Documentation:** [docs/](./README.md)

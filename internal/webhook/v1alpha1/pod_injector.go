@@ -151,23 +151,19 @@ func (i *PodInjector) shouldInject(pod *corev1.Pod, llmAccess *llmwardenv1alpha1
 func (i *PodInjector) injectCredentials(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) error {
 	// Inject environment variables if configured
 	if len(llmAccess.Spec.Injection.Env) > 0 {
-		if err := i.injectEnvVars(pod, llmAccess); err != nil {
-			return fmt.Errorf("failed to inject env vars: %w", err)
-		}
+		i.injectEnvVars(pod, llmAccess)
 	}
 
 	// Inject volume if configured
 	if llmAccess.Spec.Injection.Volume != nil {
-		if err := i.injectVolume(pod, llmAccess); err != nil {
-			return fmt.Errorf("failed to inject volume: %w", err)
-		}
+		i.injectVolume(pod, llmAccess)
 	}
 
 	return nil
 }
 
 // injectEnvVars injects environment variables into all containers in the pod.
-func (i *PodInjector) injectEnvVars(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) error {
+func (i *PodInjector) injectEnvVars(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) {
 	secretName := llmAccess.Spec.SecretName
 
 	// Create env vars from the mapping
@@ -196,12 +192,10 @@ func (i *PodInjector) injectEnvVars(pod *corev1.Pod, llmAccess *llmwardenv1alpha
 	for i := range pod.Spec.InitContainers {
 		pod.Spec.InitContainers[i].Env = append(pod.Spec.InitContainers[i].Env, envVars...)
 	}
-
-	return nil
 }
 
 // injectVolume injects a volume mount into all containers in the pod.
-func (i *PodInjector) injectVolume(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) error {
+func (i *PodInjector) injectVolume(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) {
 	volumeConfig := llmAccess.Spec.Injection.Volume
 	secretName := llmAccess.Spec.SecretName
 
@@ -235,8 +229,6 @@ func (i *PodInjector) injectVolume(pod *corev1.Pod, llmAccess *llmwardenv1alpha1
 	for i := range pod.Spec.InitContainers {
 		pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
 	}
-
-	return nil
 }
 
 // InjectDecoder injects the decoder.

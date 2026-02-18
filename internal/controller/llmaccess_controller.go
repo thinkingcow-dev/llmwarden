@@ -77,18 +77,18 @@ type LLMAccessReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	startTime := time.Now()
 
 	// Fetch the LLMAccess instance
 	llmAccess := &llmwardenv1alpha1.LLMAccess{}
 	if err := r.Get(ctx, req.NamespacedName, llmAccess); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("LLMAccess resource not found, ignoring since object must be deleted")
+			logger.Info("LLMAccess resource not found, ignoring since object must be deleted")
 			metrics.ReconciliationDuration.WithLabelValues("llmaccess", "success").Observe(time.Since(startTime).Seconds())
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to get LLMAccess")
+		logger.Error(err, "Failed to get LLMAccess")
 		metrics.ReconciliationDuration.WithLabelValues("llmaccess", "error").Observe(time.Since(startTime).Seconds())
 		return ctrl.Result{}, err
 	}
@@ -119,7 +119,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	providerKey := types.NamespacedName{Name: llmAccess.Spec.ProviderRef.Name}
 	if err := r.Get(ctx, providerKey, provider); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Error(err, "Referenced LLMProvider not found", "provider", llmAccess.Spec.ProviderRef.Name)
+			logger.Error(err, "Referenced LLMProvider not found", "provider", llmAccess.Spec.ProviderRef.Name)
 			r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonProviderNotFound,
 				fmt.Sprintf("LLMProvider %s not found", llmAccess.Spec.ProviderRef.Name))
 			r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonProviderNotFound,
@@ -134,7 +134,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Validate namespace is allowed
 	if !r.isNamespaceAllowed(llmAccess.Namespace, provider) {
-		log.Info("Namespace not allowed by provider", "namespace", llmAccess.Namespace, "provider", provider.Name)
+		logger.Info("Namespace not allowed by provider", "namespace", llmAccess.Namespace, "provider", provider.Name)
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonNamespaceNotAllowed,
 			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonNamespaceNotAllowed,
@@ -151,7 +151,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Validate requested models
 	if err := r.validateModels(llmAccess.Spec.Models, provider); err != nil {
-		log.Error(err, "Model validation failed")
+		logger.Error(err, "Model validation failed")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonModelNotAllowed, err.Error())
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonModelNotAllowed, err.Error())
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
@@ -163,7 +163,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// For MVP, only support apiKey auth type
 	if provider.Spec.Auth.Type != llmwardenv1alpha1.AuthTypeAPIKey {
-		log.Info("Auth type not supported in MVP", "authType", provider.Spec.Auth.Type)
+		logger.Info("Auth type not supported in MVP", "authType", provider.Spec.Auth.Type)
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonAuthTypeNotSupported,
 			fmt.Sprintf("Auth type %s not yet supported (MVP supports apiKey only)", provider.Spec.Auth.Type))
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
@@ -174,7 +174,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Provision credentials (copy secret from provider namespace to access namespace)
 	if err := r.provisionAPIKeySecret(ctx, llmAccess, provider); err != nil {
-		log.Error(err, "Failed to provision secret")
+		logger.Error(err, "Failed to provision secret")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonSecretUpdateFailed,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
 		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonReconciliationError,
@@ -238,7 +238,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	metrics.ReconciliationDuration.WithLabelValues("llmaccess", "success").Observe(time.Since(startTime).Seconds())
-	log.Info("Successfully reconciled LLMAccess", "namespace", llmAccess.Namespace, "name", llmAccess.Name)
+	logger.Info("Successfully reconciled LLMAccess", "namespace", llmAccess.Namespace, "name", llmAccess.Name)
 
 	// Requeue before next rotation
 	if rotationInterval > 0 {
@@ -301,7 +301,7 @@ func (r *LLMAccessReconciler) validateModels(requestedModels []string, provider 
 
 // provisionAPIKeySecret copies the secret from the provider namespace to the access namespace
 func (r *LLMAccessReconciler) provisionAPIKeySecret(ctx context.Context, llmAccess *llmwardenv1alpha1.LLMAccess, provider *llmwardenv1alpha1.LLMProvider) error {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	if provider.Spec.Auth.APIKey == nil {
 		return fmt.Errorf("provider %s does not have apiKey configuration", provider.Name)
@@ -377,7 +377,7 @@ func (r *LLMAccessReconciler) provisionAPIKeySecret(ctx context.Context, llmAcce
 		return fmt.Errorf("failed to create/update secret: %w", err)
 	}
 
-	log.Info("Secret reconciled", "result", result, "secret", targetSecret.Name)
+	logger.Info("Secret reconciled", "result", result, "secret", targetSecret.Name)
 	return nil
 }
 

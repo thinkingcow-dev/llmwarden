@@ -19,6 +19,7 @@ package provisioner
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -41,9 +42,9 @@ type ApiKeyProvisioner struct {
 }
 
 // NewApiKeyProvisioner creates a new ApiKeyProvisioner.
-func NewApiKeyProvisioner(client client.Client, scheme *runtime.Scheme) *ApiKeyProvisioner {
+func NewApiKeyProvisioner(k8sClient client.Client, scheme *runtime.Scheme) *ApiKeyProvisioner {
 	return &ApiKeyProvisioner{
-		client: client,
+		client: k8sClient,
 		scheme: scheme,
 	}
 }
@@ -116,16 +117,12 @@ func (p *ApiKeyProvisioner) Provision(ctx context.Context, provider *llmwardenv1
 		if targetSecret.Data == nil {
 			targetSecret.Data = make(map[string][]byte)
 		}
-		for k, v := range secretData {
-			targetSecret.Data[k] = v
-		}
+		maps.Copy(targetSecret.Data, secretData)
 
 		if targetSecret.StringData == nil {
 			targetSecret.StringData = make(map[string]string)
 		}
-		for k, v := range stringData {
-			targetSecret.StringData[k] = v
-		}
+		maps.Copy(targetSecret.StringData, stringData)
 
 		// Set labels for tracking
 		if targetSecret.Labels == nil {

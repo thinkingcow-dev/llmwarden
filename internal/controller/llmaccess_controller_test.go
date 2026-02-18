@@ -240,7 +240,9 @@ var _ = Describe("LLMAccess Controller", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, restrictedNs)).To(Succeed())
-			defer k8sClient.Delete(ctx, restrictedNs)
+			defer func() {
+				_ = k8sClient.Delete(ctx, restrictedNs)
+			}()
 
 			llmAccess = &llmwardenv1alpha1.LLMAccess{
 				ObjectMeta: metav1.ObjectMeta{
@@ -515,11 +517,12 @@ var _ = Describe("LLMAccess Controller", func() {
 	})
 })
 
-// randString generates a random string of length n
-func randString(n int) string {
+// randString generates a random string of length 5
+func randString(_ int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
+	const length = 5
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := make([]byte, n)
+	b := make([]byte, length)
 	for i := range b {
 		b[i] = letterBytes[rng.Intn(len(letterBytes))]
 	}

@@ -33,3 +33,4 @@ go.work
 *.env
 tmp
 *.data
+.DS_Store
