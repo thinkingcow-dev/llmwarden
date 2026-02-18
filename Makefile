@@ -110,7 +110,27 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	ENABLE_WEBHOOKS=false go run ./cmd/main.go
+
+.PHONY: run-with-webhooks
+run-with-webhooks: manifests generate fmt vet ## Run a controller from your host with webhooks enabled.
+	@echo "Running with webhooks enabled. Make sure you've run 'make setup-webhooks' first."
+	@if [ ! -f tmp/webhook-certs/tls.crt ]; then \
+		echo "ERROR: Webhook certificates not found. Run 'make setup-webhooks' first."; \
+		exit 1; \
+	fi
+	go run ./cmd/main.go --webhook-cert-path=tmp/webhook-certs
+
+.PHONY: setup-webhooks
+setup-webhooks: ## Set up webhook certificates for local development.
+	./hack/setup-local-webhooks.sh
+
+.PHONY: deploy-local
+deploy-local: docker-build ## Build and deploy operator to kind cluster for webhook testing.
+	@echo "Loading image into kind cluster..."
+	kind load docker-image ${IMG} --name llmwarden-dev
+	@echo "Deploying operator..."
+	$(MAKE) deploy IMG=${IMG}
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

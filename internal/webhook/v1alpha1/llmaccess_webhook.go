@@ -38,9 +38,25 @@ func SetupLLMAccessWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
+// SetupPodInjectorWebhookWithManager registers the pod injector webhook with the manager.
+func SetupPodInjectorWebhookWithManager(mgr ctrl.Manager) error {
+	decoder := admission.NewDecoder(mgr.GetScheme())
+
+	podInjector := &PodInjector{
+		Client:  mgr.GetClient(),
+		decoder: decoder,
+	}
+
+	mgr.GetWebhookServer().Register("/mutate-v1-pod", &admission.Webhook{
+		Handler: podInjector,
+	})
+
+	return nil
+}
+
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-// +kubebuilder:webhook:path=/mutate-llmwarden-llmwarden-io-v1alpha1-llmaccess,mutating=true,failurePolicy=fail,sideEffects=None,groups=llmwarden.llmwarden.io,resources=llmaccesses,verbs=create;update,versions=v1alpha1,name=mllmaccess-v1alpha1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-llmwarden-io-v1alpha1-llmaccess,mutating=true,failurePolicy=fail,sideEffects=None,groups=llmwarden.io,resources=llmaccesses,verbs=create;update,versions=v1alpha1,name=mllmaccess-v1alpha1.kb.io,admissionReviewVersions=v1
 
 // LLMAccessCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind LLMAccess when those are created or updated.
@@ -62,7 +78,7 @@ func (d *LLMAccessCustomDefaulter) Default(_ context.Context, obj *llmwardenv1al
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: If you want to customise the 'path', use the flags '--defaulting-path' or '--validation-path'.
-// +kubebuilder:webhook:path=/validate-llmwarden-llmwarden-io-v1alpha1-llmaccess,mutating=false,failurePolicy=fail,sideEffects=None,groups=llmwarden.llmwarden.io,resources=llmaccesses,verbs=create;update,versions=v1alpha1,name=vllmaccess-v1alpha1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-llmwarden-io-v1alpha1-llmaccess,mutating=false,failurePolicy=fail,sideEffects=None,groups=llmwarden.io,resources=llmaccesses,verbs=create;update,versions=v1alpha1,name=vllmaccess-v1alpha1.kb.io,admissionReviewVersions=v1
 
 // LLMAccessCustomValidator struct is responsible for validating the LLMAccess resource
 // when it is created, updated, or deleted.

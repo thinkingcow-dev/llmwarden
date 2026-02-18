@@ -200,6 +200,11 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "LLMAccess")
 			os.Exit(1)
 		}
+		// Register pod injector webhook
+		if err := webhookv1alpha1.SetupPodInjectorWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "PodInjector")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
