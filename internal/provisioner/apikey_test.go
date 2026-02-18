@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 )
 
 func TestApiKeyProvisioner_Provision(t *testing.T) {

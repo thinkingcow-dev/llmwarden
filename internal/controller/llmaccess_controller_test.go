@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 )
 
 var _ = Describe("LLMAccess Controller", func() {

@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 )
 
 func TestPodInjector_Handle(t *testing.T) {

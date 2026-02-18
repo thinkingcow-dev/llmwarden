@@ -35,10 +35,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
-	"github.com/tpbansal/llmwarden/internal/controller"
-	_ "github.com/tpbansal/llmwarden/internal/metrics" // Import to register metrics
-	webhookv1alpha1 "github.com/tpbansal/llmwarden/internal/webhook/v1alpha1"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
+	"github.com/thinkingcow-dev/llmwarden/internal/controller"
+	_ "github.com/thinkingcow-dev/llmwarden/internal/metrics" // Import to register metrics
+	webhookv1alpha1 "github.com/thinkingcow-dev/llmwarden/internal/webhook/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

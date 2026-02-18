@@ -35,8 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
-	"github.com/tpbansal/llmwarden/internal/metrics"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
+	"github.com/thinkingcow-dev/llmwarden/internal/metrics"
 )
 
 const (

@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	llmwardenv1alpha1 "github.com/tpbansal/llmwarden/api/v1alpha1"
+	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 )
 
 // Provisioner is the interface for credential provisioning strategies.

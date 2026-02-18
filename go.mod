@@ -1,4 +1,4 @@
-module github.com/tpbansal/llmwarden
+module github.com/thinkingcow-dev/llmwarden
 
 go 1.25.3
 
