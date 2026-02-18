@@ -1,4 +1,4 @@
-apiVersion: llmwarden.llmwarden.io/v1alpha1
+apiVersion: llmwarden.io/v1alpha1
 kind: LLMAccess
 metadata:
   labels:

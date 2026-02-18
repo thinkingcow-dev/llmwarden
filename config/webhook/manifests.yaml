@@ -10,12 +10,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-llmwarden-llmwarden-io-v1alpha1-llmaccess
+      path: /mutate-llmwarden-io-v1alpha1-llmaccess
   failurePolicy: Fail
   name: mllmaccess-v1alpha1.kb.io
   rules:
   - apiGroups:
-    - llmwarden.llmwarden.io
+    - llmwarden.io
     apiVersions:
     - v1alpha1
     operations:
@@ -55,12 +55,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-llmwarden-llmwarden-io-v1alpha1-llmaccess
+      path: /validate-llmwarden-io-v1alpha1-llmaccess
   failurePolicy: Fail
   name: vllmaccess-v1alpha1.kb.io
   rules:
   - apiGroups:
-    - llmwarden.llmwarden.io
+    - llmwarden.io
     apiVersions:
     - v1alpha1
     operations:

@@ -37,9 +37,9 @@ type LLMProviderReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=llmwarden.llmwarden.io,resources=llmproviders,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=llmwarden.llmwarden.io,resources=llmproviders/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=llmwarden.llmwarden.io,resources=llmproviders/finalizers,verbs=update
+// +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
