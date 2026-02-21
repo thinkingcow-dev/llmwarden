@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
+	"github.com/thinkingcow-dev/llmwarden/internal/provisioner"
 )
 
 var _ = Describe("LLMAccess Controller", func() {
@@ -53,9 +54,10 @@ var _ = Describe("LLMAccess Controller", func() {
 		BeforeEach(func() {
 			ctx = context.Background()
 			controllerReconciler = &LLMAccessReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				Recorder: record.NewFakeRecorder(100),
+				Client:            k8sClient,
+				Scheme:            k8sClient.Scheme(),
+				Recorder:          record.NewFakeRecorder(100),
+				ApiKeyProvisioner: provisioner.NewApiKeyProvisioner(k8sClient, k8sClient.Scheme()),
 			}
 
 			// Create provider namespace

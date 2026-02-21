@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -93,9 +94,71 @@ type LLMAccessCustomValidator struct {
 func (v *LLMAccessCustomValidator) ValidateCreate(_ context.Context, obj *llmwardenv1alpha1.LLMAccess) (admission.Warnings, error) {
 	llmaccesslog.Info("Validation for LLMAccess upon creation", "name", obj.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
+	var warnings admission.Warnings
 
-	return nil, nil
+	// Validate provider reference is not empty
+	if obj.Spec.ProviderRef.Name == "" {
+		return nil, fmt.Errorf("spec.providerRef.name cannot be empty")
+	}
+
+	// Validate secret name follows K8s naming conventions
+	if obj.Spec.SecretName == "" {
+		return nil, fmt.Errorf("spec.secretName cannot be empty")
+	}
+
+	// Validate injection configuration - must have at least env or volume
+	if len(obj.Spec.Injection.Env) == 0 && obj.Spec.Injection.Volume == nil {
+		return nil, fmt.Errorf("spec.injection must define at least one of: env or volume")
+	}
+
+	// Validate env var names don't conflict with common K8s env vars
+	reservedEnvVars := map[string]bool{
+		"KUBERNETES_SERVICE_HOST": true,
+		"KUBERNETES_SERVICE_PORT": true,
+		"HOSTNAME":                true,
+		"HOME":                    true,
+	}
+
+	for _, envMapping := range obj.Spec.Injection.Env {
+		if reservedEnvVars[envMapping.Name] {
+			warnings = append(warnings, fmt.Sprintf("env var '%s' overrides reserved Kubernetes variable", envMapping.Name))
+		}
+		// Validate env var name format
+		if !isValidEnvVarName(envMapping.Name) {
+			return warnings, fmt.Errorf("invalid env var name: %s (must match [A-Z_][A-Z0-9_]*)", envMapping.Name)
+		}
+	}
+
+	// Validate volume mount path is absolute
+	if obj.Spec.Injection.Volume != nil {
+		if obj.Spec.Injection.Volume.MountPath == "" {
+			return warnings, fmt.Errorf("spec.injection.volume.mountPath cannot be empty")
+		}
+		if obj.Spec.Injection.Volume.MountPath[0] != '/' {
+			return warnings, fmt.Errorf("spec.injection.volume.mountPath must be an absolute path")
+		}
+	}
+
+	return warnings, nil
+}
+
+// isValidEnvVarName validates environment variable names according to POSIX standard
+func isValidEnvVarName(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	// First character must be A-Z or underscore
+	if !((name[0] >= 'A' && name[0] <= 'Z') || name[0] == '_') {
+		return false
+	}
+	// Rest must be A-Z, 0-9, or underscore
+	for i := 1; i < len(name); i++ {
+		c := name[i]
+		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type LLMAccess.

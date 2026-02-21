@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,6 +45,9 @@ type LLMProviderReconciler struct {
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+
+const providerRequeueInterval = 5 * time.Minute
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,21 +68,15 @@ func (r *LLMProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Determine provider health status based on conditions
-	healthStatus := r.getProviderHealthStatus(provider)
-	if healthStatus == "healthy" {
-		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(1)
-		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(0)
-		r.Recorder.Event(provider, corev1.EventTypeNormal, "ProviderHealthy",
-			"LLM provider is healthy and ready")
-	} else {
-		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(0)
-		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(1)
-		r.Recorder.Event(provider, corev1.EventTypeWarning, "ProviderUnhealthy",
-			"LLM provider health check failed")
-	}
+	// Validate provider config and set Ready condition
+	condStatus, reason, message := r.validateProviderConfig(ctx, provider)
+	r.setCondition(provider, "Ready", condStatus, reason, message)
 
-	// Count LLMAccess resources that reference this provider
+	// Update LastCredentialCheck timestamp
+	now := metav1.Now()
+	provider.Status.LastCredentialCheck = &now
+
+	// Count LLMAccess resources referencing this provider
 	llmAccessList := &llmwardenv1alpha1.LLMAccessList{}
 	if err := r.List(ctx, llmAccessList); err != nil {
 		log.Error(err, "Failed to list LLMAccess resources")
@@ -88,30 +87,105 @@ func (r *LLMProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				accessCount++
 			}
 		}
-		// Update status with access count if needed
-		if provider.Status.AccessCount != accessCount {
-			provider.Status.AccessCount = accessCount
-			if err := r.Status().Update(ctx, provider); err != nil {
-				log.Error(err, "Failed to update provider status")
-			}
-		}
+		provider.Status.AccessCount = accessCount
+	}
+
+	if err := r.Status().Update(ctx, provider); err != nil {
+		log.Error(err, "Failed to update provider status")
+		metrics.ReconciliationDuration.WithLabelValues("llmprovider", "error").Observe(time.Since(startTime).Seconds())
+		return ctrl.Result{}, fmt.Errorf("failed to update provider status: %w", err)
+	}
+
+	// Update health metrics and emit event
+	if condStatus == metav1.ConditionTrue {
+		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(1)
+		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(0)
+		r.Recorder.Event(provider, corev1.EventTypeNormal, "ProviderHealthy",
+			"LLM provider is healthy and ready")
+	} else {
+		metrics.ProviderHealth.WithLabelValues(provider.Name, "healthy").Set(0)
+		metrics.ProviderHealth.WithLabelValues(provider.Name, "unhealthy").Set(1)
+		r.Recorder.Event(provider, corev1.EventTypeWarning, "ProviderUnhealthy",
+			fmt.Sprintf("LLM provider health check failed: %s", message))
 	}
 
 	metrics.ReconciliationDuration.WithLabelValues("llmprovider", "success").Observe(time.Since(startTime).Seconds())
-	log.V(1).Info("Successfully reconciled LLMProvider", "name", provider.Name)
+	log.V(1).Info("Successfully reconciled LLMProvider", "name", provider.Name, "ready", condStatus)
 
-	return ctrl.Result{}, nil
+	// Requeue periodically for health checks
+	return ctrl.Result{RequeueAfter: providerRequeueInterval}, nil
 }
 
-// getProviderHealthStatus determines the health status of a provider based on its conditions
-func (r *LLMProviderReconciler) getProviderHealthStatus(provider *llmwardenv1alpha1.LLMProvider) string {
-	// Check if Ready condition exists and is True
-	for _, condition := range provider.Status.Conditions {
-		if condition.Type == "Ready" && condition.Status == metav1.ConditionTrue {
-			return "healthy"
+// validateProviderConfig validates the provider's auth configuration and returns
+// the condition status, reason, and message.
+func (r *LLMProviderReconciler) validateProviderConfig(ctx context.Context, provider *llmwardenv1alpha1.LLMProvider) (metav1.ConditionStatus, string, string) {
+	switch provider.Spec.Auth.Type {
+	case llmwardenv1alpha1.AuthTypeAPIKey:
+		return r.validateAPIKeyConfig(ctx, provider)
+	case llmwardenv1alpha1.AuthTypeExternalSecret:
+		// ESO integration is Phase 2 — config is accepted but not validated
+		return metav1.ConditionTrue, "ExternalSecretNotValidated",
+			"ExternalSecret auth type accepted (validation implemented in Phase 2)"
+	case llmwardenv1alpha1.AuthTypeWorkloadIdentity:
+		// Workload identity is Phase 3 — config is accepted but not validated
+		return metav1.ConditionTrue, "WorkloadIdentityNotValidated",
+			"WorkloadIdentity auth type accepted (validation implemented in Phase 3)"
+	default:
+		return metav1.ConditionFalse, "UnknownAuthType",
+			fmt.Sprintf("Unknown auth type: %s", provider.Spec.Auth.Type)
+	}
+}
+
+// validateAPIKeyConfig checks that the referenced secret exists and contains the expected key.
+func (r *LLMProviderReconciler) validateAPIKeyConfig(ctx context.Context, provider *llmwardenv1alpha1.LLMProvider) (metav1.ConditionStatus, string, string) {
+	if provider.Spec.Auth.APIKey == nil {
+		return metav1.ConditionFalse, "InvalidConfig",
+			"spec.auth.apiKey is required when spec.auth.type is apiKey"
+	}
+
+	ref := provider.Spec.Auth.APIKey.SecretRef
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return metav1.ConditionFalse, "SecretNotFound",
+				fmt.Sprintf("Provider secret %s/%s not found", ref.Namespace, ref.Name)
+		}
+		return metav1.ConditionFalse, "SecretGetError",
+			fmt.Sprintf("Failed to get provider secret %s/%s: %v", ref.Namespace, ref.Name, err)
+	}
+
+	if _, exists := secret.Data[ref.Key]; !exists {
+		return metav1.ConditionFalse, "SecretKeyMissing",
+			fmt.Sprintf("Key %q not found in secret %s/%s", ref.Key, ref.Namespace, ref.Name)
+	}
+
+	return metav1.ConditionTrue, "SecretFound",
+		fmt.Sprintf("Provider secret %s/%s exists and contains key %q", ref.Namespace, ref.Name, ref.Key)
+}
+
+// setCondition sets or updates a condition on the provider status.
+func (r *LLMProviderReconciler) setCondition(provider *llmwardenv1alpha1.LLMProvider, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	now := metav1.Now()
+	for i, cond := range provider.Status.Conditions {
+		if cond.Type == conditionType {
+			if cond.Status != status {
+				provider.Status.Conditions[i].LastTransitionTime = now
+			}
+			provider.Status.Conditions[i].Status = status
+			provider.Status.Conditions[i].Reason = reason
+			provider.Status.Conditions[i].Message = message
+			provider.Status.Conditions[i].ObservedGeneration = provider.Generation
+			return
 		}
 	}
-	return "unhealthy"
+	provider.Status.Conditions = append(provider.Status.Conditions, metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		LastTransitionTime: now,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: provider.Generation,
+	})
 }
 
 // SetupWithManager sets up the controller with the Manager.

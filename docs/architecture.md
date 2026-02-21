@@ -350,6 +350,129 @@ NOT in MVP: ESO integration, workload identity, auto-rotation via provider APIs,
 | cert-manager | cert-manager: TLS certs. llmwarden: LLM credentials. Same philosophy, different domain. |
 | Manual K8s Secrets | No rotation, no audit, no namespace isolation, no model scoping. |
 
+## Security Architecture
+
+### Threat Model
+
+llmwarden protects against the following threat vectors:
+
+1. **Secret Leakage**
+   - Credentials exposed in pod specs, logs, or events
+   - Secrets persisted in version control or backups
+   - Unauthorized cross-namespace access to credentials
+
+2. **Privilege Escalation**
+   - Workloads accessing providers they shouldn't
+   - Namespace label manipulation to bypass restrictions
+   - RBAC bypass through direct secret access
+
+3. **Credential Theft**
+   - API keys stolen from running containers
+   - Keys extracted from Kubernetes API
+   - Man-in-the-middle attacks on credential provisioning
+
+4. **Availability Attacks**
+   - Resource exhaustion via excessive rotation requests
+   - DoS through malformed CRD specs
+   - Webhook blocking legitimate pod creation
+
+### Security Controls
+
+#### Defense in Depth
+
+1. **Network Layer**
+   - TLS 1.2+ enforced for all webhook and metrics endpoints
+   - HTTP/2 disabled by default (CVE mitigation)
+   - mTLS via cert-manager for webhook authentication
+
+2. **API Layer**
+   - Namespace isolation via `namespaceSelector` on LLMProvider
+   - Model allowlisting prevents access to unauthorized models
+   - Admission webhooks validate all LLMAccess configurations
+   - CEL expressions for declarative validation in CRDs
+
+3. **Secret Management**
+   - Secrets never logged or exposed in events
+   - Volume mounts enforced as read-only with 0400 permissions
+   - Owner references ensure automatic cleanup on deletion
+   - Cross-namespace secret copying uses temporary in-memory buffers
+
+4. **RBAC**
+   - Least privilege for operator ServiceAccount
+   - Separate roles for platform admins vs. developers
+   - Namespace-scoped LLMAccess resources
+   - Cluster-scoped LLMProvider for centralized control
+
+5. **Input Validation**
+   - Duration strings capped at 365 days to prevent overflow
+   - Env var names validated against POSIX standards
+   - Mount paths validated to prevent conflicts
+   - Reserved Kubernetes env vars protected from override
+
+6. **Audit Trail**
+   - All credential provisioning events logged to Kubernetes events API
+   - Prometheus metrics track access patterns and rotation
+   - Status conditions provide tamper-evident history
+   - Labels track which LLMAccess created which Secret
+
+#### Secure Defaults
+
+- Webhook failure policy: `ignore` for pod injector (fail-open for availability)
+- Webhook failure policy: `fail` for LLMAccess validator (fail-closed for security)
+- Secret volume mounts: read-only with 0400 file permissions
+- TLS: minimum version 1.2, prefer server cipher suites
+- HTTP/2: disabled unless explicitly enabled
+- Rotation: disabled by default (opt-in)
+
+### Security Hardening Checklist
+
+**Pre-Deployment**
+- [ ] Review RBAC rules in `config/rbac/` for least privilege
+- [ ] Enable cert-manager for webhook TLS certificates
+- [ ] Configure namespace selectors on all LLMProviders
+- [ ] Set model allowlists for production providers
+- [ ] Enable rotation schedules appropriate for your threat model
+- [ ] Configure Prometheus alerting on rotation failures
+
+**Runtime**
+- [ ] Monitor `llmwarden_webhook_injections_total` for unexpected spikes
+- [ ] Alert on `llmwarden_credential_rotation_errors_total` > 0
+- [ ] Audit `kubectl get llmaccess --all-namespaces` regularly
+- [ ] Scan for Secrets without owner references (manual bypass)
+- [ ] Review events: `kubectl get events --field-selector involvedObject.kind=LLMAccess`
+
+**Incident Response**
+- Revoke compromised credential: delete source Secret in provider namespace
+- Rotate all downstream credentials: delete all LLMAccess resources, operator will recreate
+- Identify affected workloads: `kubectl get pods -l llmwarden.io/injected-providers=<provider>`
+- Forensics: check LLMAccess status conditions for last rotation timestamps
+
+### Known Limitations (MVP)
+
+- **No secret encryption at rest**: Relies on Kubernetes cluster configuration (enable encryption at rest on etcd)
+- **No external KMS integration**: Secrets stored in etcd, not externalized (use ESO integration in Phase 2)
+- **No automatic key revocation**: Rotation creates new keys but doesn't revoke old ones (Phase 4 feature)
+- **No rate limiting enforcement**: RateLimit is informational only, not enforced by operator
+- **No audit log export**: Events stored in Kubernetes only, no SIEM integration
+
+### Compliance Considerations
+
+**SOC 2 / ISO 27001**
+- Credentials centrally managed (reduces shadow IT)
+- Audit trail via Kubernetes events
+- Separation of duties (platform team vs. dev team RBAC)
+- Documented rotation policies
+
+**PCI DSS**
+- Encryption in transit (TLS 1.2+)
+- Access controls (RBAC + namespace selectors)
+- Audit trails (events + metrics)
+- Key rotation capability
+
+**GDPR**
+- No PII stored in llmwarden resources
+- API keys may contain customer data sent to LLM providers (review provider DPAs)
+
 ## Future Considerations
 
 - **SPIRE integration**: Exchange JWT-SVID for cloud STS tokens, then for LLM provider tokens
@@ -357,3 +480,6 @@ NOT in MVP: ESO integration, workload identity, auto-rotation via provider APIs,
 - **Gateway integration**: Auto-configure Envoy AI Gateway BackendSecurityPolicy from LLMProvider
 - **Multi-cluster**: Use Liqo or Submariner patterns for cross-cluster LLMProvider federation
 - **OPA/Gatekeeper**: Alternative to Kyverno for policy enforcement
+- **Secrets encryption**: Integration with external KMS (AWS KMS, Azure Key Vault, GCP KMS)
+- **Anomaly detection**: ML-based detection of unusual access patterns
+- **Zero-trust networking**: Automatic service mesh policy generation based on LLMAccess

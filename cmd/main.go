@@ -38,6 +38,7 @@ import (
 	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 	"github.com/thinkingcow-dev/llmwarden/internal/controller"
 	_ "github.com/thinkingcow-dev/llmwarden/internal/metrics" // Import to register metrics
+	"github.com/thinkingcow-dev/llmwarden/internal/provisioner"
 	webhookv1alpha1 "github.com/thinkingcow-dev/llmwarden/internal/webhook/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -99,6 +100,17 @@ func main() {
 		setupLog.Info("disabling http/2")
 		c.NextProtos = []string{"http/1.1"}
 	}
+
+	// secureMinTLSVersion ensures minimum TLS 1.2 to prevent downgrade attacks
+	secureMinTLSVersion := func(c *tls.Config) {
+		setupLog.Info("enforcing minimum TLS 1.2")
+		c.MinVersion = tls.VersionTLS12
+		// Prefer server cipher suites for better security
+		c.PreferServerCipherSuites = true
+	}
+
+	// Always enforce minimum TLS version
+	tlsOpts = append(tlsOpts, secureMinTLSVersion)
 
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
@@ -189,9 +201,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.LLMAccessReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("llmaccess-controller"), //nolint:staticcheck // Using legacy events API for compatibility
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Recorder:          mgr.GetEventRecorderFor("llmaccess-controller"), //nolint:staticcheck // Using legacy events API for compatibility
+		ApiKeyProvisioner: provisioner.NewApiKeyProvisioner(mgr.GetClient(), mgr.GetScheme()),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMAccess")
 		os.Exit(1)

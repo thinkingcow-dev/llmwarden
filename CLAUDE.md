@@ -152,9 +152,17 @@ llmwarden/
 
 ### Security
 - Principle of least privilege for RBAC
-- No secrets logged or exposed in events
+- No secrets logged or exposed in events (API keys are redacted from all logs)
 - Audit-relevant actions emit K8s events
 - Webhook TLS via cert-manager
+- TLS 1.2+ minimum version enforced
+- HTTP/2 disabled by default to mitigate CVEs
+- Input validation prevents DoS via duration overflow (max 365 days)
+- Context propagation prevents context leakage
+- Secret volume mounts enforced as read-only with 0400 permissions
+- Mount path conflict detection prevents accidental overwrites
+- Reserved env vars protected from override
+- Env var names validated against POSIX standards
 
 ## Phase Plan
 

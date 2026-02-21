@@ -37,6 +37,7 @@ import (
 
 	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 	"github.com/thinkingcow-dev/llmwarden/internal/metrics"
+	"github.com/thinkingcow-dev/llmwarden/internal/provisioner"
 )
 
 const (
@@ -62,8 +63,9 @@ const (
 // LLMAccessReconciler reconciles a LLMAccess object
 type LLMAccessReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme            *runtime.Scheme
+	Recorder          record.EventRecorder
+	ApiKeyProvisioner *provisioner.ApiKeyProvisioner
 }
 
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmaccesses,verbs=get;list;watch;create;update;patch;delete
@@ -133,7 +135,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Validate namespace is allowed
-	if !r.isNamespaceAllowed(llmAccess.Namespace, provider) {
+	if !r.isNamespaceAllowed(ctx, llmAccess.Namespace, provider) {
 		logger.Info("Namespace not allowed by provider", "namespace", llmAccess.Namespace, "provider", provider.Name)
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonNamespaceNotAllowed,
 			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
@@ -172,8 +174,8 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 	}
 
-	// Provision credentials (copy secret from provider namespace to access namespace)
-	if err := r.provisionAPIKeySecret(ctx, llmAccess, provider); err != nil {
+	// Provision credentials via the ApiKeyProvisioner
+	if _, err := r.ApiKeyProvisioner.Provision(ctx, provider, llmAccess); err != nil {
 		logger.Error(err, "Failed to provision secret")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonSecretUpdateFailed,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
@@ -249,7 +251,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // isNamespaceAllowed checks if the namespace is allowed by the provider's namespace selector
-func (r *LLMAccessReconciler) isNamespaceAllowed(namespace string, provider *llmwardenv1alpha1.LLMProvider) bool {
+func (r *LLMAccessReconciler) isNamespaceAllowed(ctx context.Context, namespace string, provider *llmwardenv1alpha1.LLMProvider) bool {
 	// If no selector is defined, all namespaces are allowed
 	if provider.Spec.NamespaceSelector == nil {
 		return true
@@ -257,7 +259,6 @@ func (r *LLMAccessReconciler) isNamespaceAllowed(namespace string, provider *llm
 
 	// Get the namespace object to check its labels
 	ns := &corev1.Namespace{}
-	ctx := context.Background()
 	if err := r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		return false
 	}
@@ -299,88 +300,6 @@ func (r *LLMAccessReconciler) validateModels(requestedModels []string, provider 
 	return nil
 }
 
-// provisionAPIKeySecret copies the secret from the provider namespace to the access namespace
-func (r *LLMAccessReconciler) provisionAPIKeySecret(ctx context.Context, llmAccess *llmwardenv1alpha1.LLMAccess, provider *llmwardenv1alpha1.LLMProvider) error {
-	logger := log.FromContext(ctx)
-
-	if provider.Spec.Auth.APIKey == nil {
-		return fmt.Errorf("provider %s does not have apiKey configuration", provider.Name)
-	}
-
-	// Fetch the source secret from the provider's namespace
-	sourceSecret := &corev1.Secret{}
-	sourceKey := types.NamespacedName{
-		Name:      provider.Spec.Auth.APIKey.SecretRef.Name,
-		Namespace: provider.Spec.Auth.APIKey.SecretRef.Namespace,
-	}
-	if err := r.Get(ctx, sourceKey, sourceSecret); err != nil {
-		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("provider secret %s/%s not found: %w", sourceKey.Namespace, sourceKey.Name, err)
-		}
-		return fmt.Errorf("failed to get provider secret: %w", err)
-	}
-
-	// Verify the key exists in the source secret
-	secretKey := provider.Spec.Auth.APIKey.SecretRef.Key
-	if _, exists := sourceSecret.Data[secretKey]; !exists {
-		return fmt.Errorf("key %s not found in secret %s/%s", secretKey, sourceKey.Namespace, sourceKey.Name)
-	}
-
-	// Create or update the target secret in the LLMAccess namespace
-	targetSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      llmAccess.Spec.SecretName,
-			Namespace: llmAccess.Namespace,
-		},
-	}
-
-	result, err := controllerutil.CreateOrUpdate(ctx, r.Client, targetSecret, func() error {
-		// Set owner reference for garbage collection
-		if err := controllerutil.SetControllerReference(llmAccess, targetSecret, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %w", err)
-		}
-
-		// Copy the secret data
-		// Create a map with keys that the injection config expects
-		if targetSecret.Data == nil {
-			targetSecret.Data = make(map[string][]byte)
-		}
-
-		// Copy the API key with a standard key name
-		targetSecret.Data["apiKey"] = sourceSecret.Data[secretKey]
-
-		// Add additional metadata that might be useful
-		if targetSecret.StringData == nil {
-			targetSecret.StringData = make(map[string]string)
-		}
-
-		// Add base URL if configured
-		if provider.Spec.Endpoint != nil && provider.Spec.Endpoint.BaseURL != "" {
-			targetSecret.StringData["baseUrl"] = provider.Spec.Endpoint.BaseURL
-		}
-
-		// Add provider type for reference
-		targetSecret.StringData["provider"] = string(provider.Spec.Provider)
-
-		// Add labels for tracking
-		if targetSecret.Labels == nil {
-			targetSecret.Labels = make(map[string]string)
-		}
-		targetSecret.Labels["llmwarden.io/managed-by"] = "llmwarden"
-		targetSecret.Labels["llmwarden.io/provider"] = provider.Name
-		targetSecret.Labels["llmwarden.io/access"] = llmAccess.Name
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to create/update secret: %w", err)
-	}
-
-	logger.Info("Secret reconciled", "result", result, "secret", targetSecret.Name)
-	return nil
-}
-
 // getRotationInterval calculates the rotation interval for this LLMAccess
 func (r *LLMAccessReconciler) getRotationInterval(llmAccess *llmwardenv1alpha1.LLMAccess, provider *llmwardenv1alpha1.LLMProvider) time.Duration {
 	// Check if LLMAccess has a rotation override
@@ -405,6 +324,7 @@ func (r *LLMAccessReconciler) getRotationInterval(llmAccess *llmwardenv1alpha1.L
 }
 
 // parseDuration parses duration strings like "30d", "7d", "24h"
+// Maximum allowed: 365 days to prevent DoS via excessive durations
 func parseDuration(s string) (time.Duration, error) {
 	if s == "" {
 		return 0, fmt.Errorf("empty duration string")
@@ -424,6 +344,10 @@ func parseDuration(s string) (time.Duration, error) {
 			if err != nil {
 				return 0, fmt.Errorf("invalid duration value: %w", err)
 			}
+			// Prevent integer overflow
+			if value < 0 || value > 365 {
+				return 0, fmt.Errorf("duration value out of range (0-365): %d", value)
+			}
 			unit = s[i:]
 			break
 		}
@@ -433,16 +357,24 @@ func parseDuration(s string) (time.Duration, error) {
 		return 0, fmt.Errorf("missing duration unit in: %s", s)
 	}
 
+	var duration time.Duration
 	switch unit {
 	case "d":
-		return time.Duration(value) * 24 * time.Hour, nil
+		duration = time.Duration(value) * 24 * time.Hour
 	case "h":
-		return time.Duration(value) * time.Hour, nil
+		duration = time.Duration(value) * time.Hour
 	case "m":
-		return time.Duration(value) * time.Minute, nil
+		duration = time.Duration(value) * time.Minute
 	default:
 		return 0, fmt.Errorf("unsupported duration unit: %s", unit)
 	}
+
+	// Additional safety check: max 365 days
+	if duration > 365*24*time.Hour {
+		return 0, fmt.Errorf("duration exceeds maximum allowed (365 days): %s", s)
+	}
+
+	return duration, nil
 }
 
 // setCondition sets a condition on the LLMAccess status

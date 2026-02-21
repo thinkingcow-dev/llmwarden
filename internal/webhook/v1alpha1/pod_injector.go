@@ -202,33 +202,53 @@ func (i *PodInjector) injectVolume(pod *corev1.Pod, llmAccess *llmwardenv1alpha1
 	// Create a unique volume name
 	volumeName := fmt.Sprintf("llmwarden-%s", llmAccess.Name)
 
-	// Add volume to pod spec
+	// Add volume to pod spec with DefaultMode set to 0400 (read-only for owner only)
+	defaultMode := int32(0400)
 	volume := corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: secretName,
+				SecretName:  secretName,
+				DefaultMode: &defaultMode,
 			},
 		},
 	}
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 
-	// Create volume mount
+	// Create volume mount - force ReadOnly to true for security
 	volumeMount := corev1.VolumeMount{
 		Name:      volumeName,
 		MountPath: volumeConfig.MountPath,
-		ReadOnly:  volumeConfig.ReadOnly,
+		ReadOnly:  true, // Always enforce read-only for credential volumes
 	}
 
 	// Add volume mount to all containers
-	for i := range pod.Spec.Containers {
-		pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, volumeMount)
+	for idx := range pod.Spec.Containers {
+		// Check for mount path conflicts
+		if !i.hasVolumeMountConflict(&pod.Spec.Containers[idx], volumeMount.MountPath) {
+			pod.Spec.Containers[idx].VolumeMounts = append(pod.Spec.Containers[idx].VolumeMounts, volumeMount)
+		}
 	}
 
 	// Add volume mount to all init containers
-	for i := range pod.Spec.InitContainers {
-		pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
+	for idx := range pod.Spec.InitContainers {
+		if !i.hasVolumeMountConflict(&pod.Spec.InitContainers[idx], volumeMount.MountPath) {
+			pod.Spec.InitContainers[idx].VolumeMounts = append(pod.Spec.InitContainers[idx].VolumeMounts, volumeMount)
+		}
 	}
+}
+
+// hasVolumeMountConflict checks if a mount path conflicts with existing mounts
+func (i *PodInjector) hasVolumeMountConflict(container *corev1.Container, mountPath string) bool {
+	for _, existingMount := range container.VolumeMounts {
+		if existingMount.MountPath == mountPath {
+			podinjectorlog.Info("Skipping volume injection due to mount path conflict",
+				"container", container.Name,
+				"mountPath", mountPath)
+			return true
+		}
+	}
+	return false
 }
 
 // InjectDecoder injects the decoder.

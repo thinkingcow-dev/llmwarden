@@ -17,6 +17,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check generated files are up-to-date
+        run: |
+          make generate manifests
+          git diff --exit-code || (echo "Generated files are out of date. Run 'make generate manifests' and commit the result." && exit 1)
+
       - name: Running Tests
         run: |
           go mod tidy
