@@ -123,9 +123,7 @@ func (r *LLMProviderReconciler) validateProviderConfig(ctx context.Context, prov
 	case llmwardenv1alpha1.AuthTypeAPIKey:
 		return r.validateAPIKeyConfig(ctx, provider)
 	case llmwardenv1alpha1.AuthTypeExternalSecret:
-		// ESO integration is Phase 2 — config is accepted but not validated
-		return metav1.ConditionTrue, "ExternalSecretNotValidated",
-			"ExternalSecret auth type accepted (validation implemented in Phase 2)"
+		return r.validateExternalSecretConfig(provider)
 	case llmwardenv1alpha1.AuthTypeWorkloadIdentity:
 		// Workload identity is Phase 3 — config is accepted but not validated
 		return metav1.ConditionTrue, "WorkloadIdentityNotValidated",
@@ -161,6 +159,34 @@ func (r *LLMProviderReconciler) validateAPIKeyConfig(ctx context.Context, provid
 
 	return metav1.ConditionTrue, "SecretFound",
 		fmt.Sprintf("Provider secret %s/%s exists and contains key %q", ref.Namespace, ref.Name, ref.Key)
+}
+
+// validateExternalSecretConfig validates that the externalSecret auth config is well-formed.
+// It does not attempt to contact ESO — ESO may not be installed yet when the provider is created.
+func (r *LLMProviderReconciler) validateExternalSecretConfig(provider *llmwardenv1alpha1.LLMProvider) (metav1.ConditionStatus, string, string) {
+	cfg := provider.Spec.Auth.ExternalSecret
+	if cfg == nil {
+		return metav1.ConditionFalse, "InvalidConfig",
+			"spec.auth.externalSecret is required when spec.auth.type is externalSecret"
+	}
+
+	if cfg.Store.Name == "" {
+		return metav1.ConditionFalse, "InvalidConfig",
+			"spec.auth.externalSecret.store.name must not be empty"
+	}
+
+	if cfg.Store.Kind != "SecretStore" && cfg.Store.Kind != "ClusterSecretStore" {
+		return metav1.ConditionFalse, "InvalidConfig",
+			fmt.Sprintf("spec.auth.externalSecret.store.kind must be SecretStore or ClusterSecretStore, got %q", cfg.Store.Kind)
+	}
+
+	if cfg.RemoteRef.Key == "" {
+		return metav1.ConditionFalse, "InvalidConfig",
+			"spec.auth.externalSecret.remoteRef.key must not be empty"
+	}
+
+	return metav1.ConditionTrue, "ExternalSecretConfigured",
+		fmt.Sprintf("ExternalSecret configured: %s/%s → %s", cfg.Store.Kind, cfg.Store.Name, cfg.RemoteRef.Key)
 }
 
 // setCondition sets or updates a condition on the provider status.

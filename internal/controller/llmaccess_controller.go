@@ -63,9 +63,10 @@ const (
 // LLMAccessReconciler reconciles a LLMAccess object
 type LLMAccessReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	Recorder          record.EventRecorder
-	ApiKeyProvisioner *provisioner.ApiKeyProvisioner
+	Scheme                    *runtime.Scheme
+	Recorder                  record.EventRecorder
+	ApiKeyProvisioner         *provisioner.ApiKeyProvisioner
+	ExternalSecretProvisioner *provisioner.ExternalSecretProvisioner
 }
 
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmaccesses,verbs=get;list;watch;create;update;patch;delete
@@ -75,6 +76,7 @@ type LLMAccessReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups=external-secrets.io,resources=externalsecrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -163,19 +165,20 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
-	// For MVP, only support apiKey auth type
-	if provider.Spec.Auth.Type != llmwardenv1alpha1.AuthTypeAPIKey {
-		logger.Info("Auth type not supported in MVP", "authType", provider.Spec.Auth.Type)
-		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonAuthTypeNotSupported,
-			fmt.Sprintf("Auth type %s not yet supported (MVP supports apiKey only)", provider.Spec.Auth.Type))
-		if err := r.Status().Update(ctx, llmAccess); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
+	// Select the provisioner based on the provider's auth type.
+	prov, err := r.selectProvisioner(provider.Spec.Auth.Type)
+	if err != nil {
+		logger.Info("Auth type not supported", "authType", provider.Spec.Auth.Type)
+		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonAuthTypeNotSupported, err.Error())
+		if statusErr := r.Status().Update(ctx, llmAccess); statusErr != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", statusErr)
 		}
-		return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+		// Permanent error — don't requeue until the spec changes.
+		return ctrl.Result{}, nil
 	}
 
-	// Provision credentials via the ApiKeyProvisioner
-	if _, err := r.ApiKeyProvisioner.Provision(ctx, provider, llmAccess); err != nil {
+	// Provision credentials via the selected provisioner.
+	if _, err := prov.Provision(ctx, provider, llmAccess); err != nil {
 		logger.Error(err, "Failed to provision secret")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonSecretUpdateFailed,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
@@ -248,6 +251,24 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// selectProvisioner returns the Provisioner implementation for the given auth type.
+func (r *LLMAccessReconciler) selectProvisioner(authType llmwardenv1alpha1.AuthType) (provisioner.Provisioner, error) {
+	switch authType {
+	case llmwardenv1alpha1.AuthTypeAPIKey:
+		if r.ApiKeyProvisioner == nil {
+			return nil, fmt.Errorf("auth type %s: provisioner not configured", authType)
+		}
+		return r.ApiKeyProvisioner, nil
+	case llmwardenv1alpha1.AuthTypeExternalSecret:
+		if r.ExternalSecretProvisioner == nil {
+			return nil, fmt.Errorf("auth type %s: provisioner not configured", authType)
+		}
+		return r.ExternalSecretProvisioner, nil
+	default:
+		return nil, fmt.Errorf("auth type %s is not supported", authType)
+	}
 }
 
 // isNamespaceAllowed checks if the namespace is allowed by the provider's namespace selector

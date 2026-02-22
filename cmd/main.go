@@ -37,6 +37,7 @@ import (
 
 	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 	"github.com/thinkingcow-dev/llmwarden/internal/controller"
+	"github.com/thinkingcow-dev/llmwarden/internal/eso"
 	_ "github.com/thinkingcow-dev/llmwarden/internal/metrics" // Import to register metrics
 	"github.com/thinkingcow-dev/llmwarden/internal/provisioner"
 	webhookv1alpha1 "github.com/thinkingcow-dev/llmwarden/internal/webhook/v1alpha1"
@@ -205,6 +206,11 @@ func main() {
 		Scheme:            mgr.GetScheme(),
 		Recorder:          mgr.GetEventRecorderFor("llmaccess-controller"), //nolint:staticcheck // Using legacy events API for compatibility
 		ApiKeyProvisioner: provisioner.NewApiKeyProvisioner(mgr.GetClient(), mgr.GetScheme()),
+		ExternalSecretProvisioner: provisioner.NewExternalSecretProvisioner(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			eso.NewV1Beta1Adapter(),
+		),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMAccess")
 		os.Exit(1)
