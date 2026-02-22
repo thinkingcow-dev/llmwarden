@@ -258,11 +258,11 @@ func TestExternalSecretProvisioner_Provision(t *testing.T) {
 				if len(dataSlice) == 0 {
 					t.Fatal("spec.data is empty")
 				}
-				firstData, ok := dataSlice[0].(map[string]interface{})
+				firstData, ok := dataSlice[0].(map[string]any)
 				if !ok {
 					t.Fatal("spec.data[0] is not a map")
 				}
-				remoteRef, ok := firstData["remoteRef"].(map[string]interface{})
+				remoteRef, ok := firstData["remoteRef"].(map[string]any)
 				if !ok {
 					t.Fatal("spec.data[0].remoteRef is not a map")
 				}
@@ -368,9 +368,9 @@ func TestExternalSecretProvisioner_HealthCheck(t *testing.T) {
 		es.SetGroupVersionKind(adapter.GVK())
 		es.SetNamespace(namespace)
 		es.SetName(name)
-		es.Object["status"] = map[string]interface{}{
-			"conditions": []interface{}{
-				map[string]interface{}{
+		es.Object["status"] = map[string]any{
+			"conditions": []any{
+				map[string]any{
 					"type":    "Ready",
 					"status":  conditionStatus,
 					"message": message,
