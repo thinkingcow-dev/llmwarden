@@ -148,13 +148,13 @@ func isValidEnvVarName(name string) bool {
 		return false
 	}
 	// First character must be A-Z or underscore
-	if !((name[0] >= 'A' && name[0] <= 'Z') || name[0] == '_') {
+	if (name[0] < 'A' || name[0] > 'Z') && name[0] != '_' {
 		return false
 	}
 	// Rest must be A-Z, 0-9, or underscore
 	for i := 1; i < len(name); i++ {
 		c := name[i]
-		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
 			return false
 		}
 	}

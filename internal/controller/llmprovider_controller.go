@@ -47,7 +47,10 @@ type LLMProviderReconciler struct {
 // +kubebuilder:rbac:groups=llmwarden.io,resources=llmproviders/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-const providerRequeueInterval = 5 * time.Minute
+const (
+	providerRequeueInterval = 5 * time.Minute
+	reasonInvalidConfig     = "InvalidConfig"
+)
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -137,7 +140,7 @@ func (r *LLMProviderReconciler) validateProviderConfig(ctx context.Context, prov
 // validateAPIKeyConfig checks that the referenced secret exists and contains the expected key.
 func (r *LLMProviderReconciler) validateAPIKeyConfig(ctx context.Context, provider *llmwardenv1alpha1.LLMProvider) (metav1.ConditionStatus, string, string) {
 	if provider.Spec.Auth.APIKey == nil {
-		return metav1.ConditionFalse, "InvalidConfig",
+		return metav1.ConditionFalse, reasonInvalidConfig,
 			"spec.auth.apiKey is required when spec.auth.type is apiKey"
 	}
 
@@ -166,22 +169,22 @@ func (r *LLMProviderReconciler) validateAPIKeyConfig(ctx context.Context, provid
 func (r *LLMProviderReconciler) validateExternalSecretConfig(provider *llmwardenv1alpha1.LLMProvider) (metav1.ConditionStatus, string, string) {
 	cfg := provider.Spec.Auth.ExternalSecret
 	if cfg == nil {
-		return metav1.ConditionFalse, "InvalidConfig",
+		return metav1.ConditionFalse, reasonInvalidConfig,
 			"spec.auth.externalSecret is required when spec.auth.type is externalSecret"
 	}
 
 	if cfg.Store.Name == "" {
-		return metav1.ConditionFalse, "InvalidConfig",
+		return metav1.ConditionFalse, reasonInvalidConfig,
 			"spec.auth.externalSecret.store.name must not be empty"
 	}
 
 	if cfg.Store.Kind != "SecretStore" && cfg.Store.Kind != "ClusterSecretStore" {
-		return metav1.ConditionFalse, "InvalidConfig",
+		return metav1.ConditionFalse, reasonInvalidConfig,
 			fmt.Sprintf("spec.auth.externalSecret.store.kind must be SecretStore or ClusterSecretStore, got %q", cfg.Store.Kind)
 	}
 
 	if cfg.RemoteRef.Key == "" {
-		return metav1.ConditionFalse, "InvalidConfig",
+		return metav1.ConditionFalse, reasonInvalidConfig,
 			"spec.auth.externalSecret.remoteRef.key must not be empty"
 	}
 

@@ -61,23 +61,23 @@ func (a *V1Beta1Adapter) Build(namespace, name string, labels map[string]string,
 // buildSpec converts our internal ExternalSecretSpec to the ESO v1beta1 spec map.
 // Field names match the ESO v1beta1 API exactly. Updating this method is the only
 // change needed when ESO alters field names or structure in a future version.
-func (a *V1Beta1Adapter) buildSpec(spec ExternalSecretSpec) map[string]interface{} {
+func (a *V1Beta1Adapter) buildSpec(spec ExternalSecretSpec) map[string]any {
 	// SecretStore reference
-	secretStoreRef := map[string]interface{}{
+	secretStoreRef := map[string]any{
 		"name": spec.StoreRef.Name,
 		"kind": spec.StoreRef.Kind,
 	}
 
 	// Target secret configuration
-	target := map[string]interface{}{
+	target := map[string]any{
 		"name":           spec.Target.Name,
 		"creationPolicy": string(spec.Target.CreationPolicy),
 	}
 
 	// Data entries: remote → local secret key mappings
-	data := make([]interface{}, 0, len(spec.Data))
+	data := make([]any, 0, len(spec.Data))
 	for _, d := range spec.Data {
-		remoteRef := map[string]interface{}{
+		remoteRef := map[string]any{
 			"key": d.RemoteRef.Key,
 		}
 		if d.RemoteRef.Property != "" {
@@ -86,13 +86,13 @@ func (a *V1Beta1Adapter) buildSpec(spec ExternalSecretSpec) map[string]interface
 		if d.RemoteRef.Version != "" {
 			remoteRef["version"] = d.RemoteRef.Version
 		}
-		data = append(data, map[string]interface{}{
+		data = append(data, map[string]any{
 			"secretKey": d.SecretKey,
 			"remoteRef": remoteRef,
 		})
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"refreshInterval": spec.RefreshInterval,
 		"secretStoreRef":  secretStoreRef,
 		"target":          target,
@@ -120,7 +120,7 @@ func (a *V1Beta1Adapter) ParseSyncStatus(obj *unstructured.Unstructured) *SyncSt
 	}
 
 	for _, c := range conditions {
-		condMap, ok := c.(map[string]interface{})
+		condMap, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}

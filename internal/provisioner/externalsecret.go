@@ -19,6 +19,7 @@ package provisioner
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -117,9 +118,7 @@ func (p *ExternalSecretProvisioner) Provision(ctx context.Context, provider *llm
 		if existingLabels == nil {
 			existingLabels = make(map[string]string)
 		}
-		for k, v := range labels {
-			existingLabels[k] = v
-		}
+		maps.Copy(existingLabels, labels)
 		existing.SetLabels(existingLabels)
 
 		// Apply spec from the desired object built by the adapter.

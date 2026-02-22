@@ -106,8 +106,6 @@ func main() {
 	secureMinTLSVersion := func(c *tls.Config) {
 		setupLog.Info("enforcing minimum TLS 1.2")
 		c.MinVersion = tls.VersionTLS12
-		// Prefer server cipher suites for better security
-		c.PreferServerCipherSuites = true
 	}
 
 	// Always enforce minimum TLS version
@@ -196,7 +194,7 @@ func main() {
 	if err := (&controller.LLMProviderReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("llmprovider-controller"), //nolint:staticcheck // Using legacy events API for compatibility
+		Recorder: mgr.GetEventRecorderFor("llmprovider-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMProvider")
 		os.Exit(1)
@@ -204,7 +202,7 @@ func main() {
 	if err := (&controller.LLMAccessReconciler{
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
-		Recorder:          mgr.GetEventRecorderFor("llmaccess-controller"), //nolint:staticcheck // Using legacy events API for compatibility
+		Recorder:          mgr.GetEventRecorderFor("llmaccess-controller"),
 		ApiKeyProvisioner: provisioner.NewApiKeyProvisioner(mgr.GetClient(), mgr.GetScheme()),
 		ExternalSecretProvisioner: provisioner.NewExternalSecretProvisioner(
 			mgr.GetClient(),

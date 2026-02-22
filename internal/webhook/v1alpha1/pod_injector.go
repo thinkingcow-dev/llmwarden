@@ -89,13 +89,7 @@ func (i *PodInjector) Handle(ctx context.Context, req admission.Request) admissi
 				"llmaccess", llmAccess.Name,
 				"provider", llmAccess.Spec.ProviderRef.Name)
 
-			if err := i.injectCredentials(pod, &llmAccess); err != nil {
-				podinjectorlog.Error(err, "Failed to inject credentials",
-					"pod", pod.Name,
-					"llmaccess", llmAccess.Name)
-				continue
-			}
-
+			i.injectCredentials(pod, &llmAccess)
 			injectedProviders = append(injectedProviders, llmAccess.Spec.ProviderRef.Name)
 			// Track successful injection in metrics
 			metrics.WebhookInjectionsTotal.WithLabelValues(req.Namespace, llmAccess.Spec.ProviderRef.Name).Inc()
@@ -148,7 +142,7 @@ func (i *PodInjector) shouldInject(pod *corev1.Pod, llmAccess *llmwardenv1alpha1
 }
 
 // injectCredentials injects environment variables and/or volumes into the pod.
-func (i *PodInjector) injectCredentials(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) error {
+func (i *PodInjector) injectCredentials(pod *corev1.Pod, llmAccess *llmwardenv1alpha1.LLMAccess) {
 	// Inject environment variables if configured
 	if len(llmAccess.Spec.Injection.Env) > 0 {
 		i.injectEnvVars(pod, llmAccess)
@@ -158,8 +152,6 @@ func (i *PodInjector) injectCredentials(pod *corev1.Pod, llmAccess *llmwardenv1a
 	if llmAccess.Spec.Injection.Volume != nil {
 		i.injectVolume(pod, llmAccess)
 	}
-
-	return nil
 }
 
 // injectEnvVars injects environment variables into all containers in the pod.

@@ -253,7 +253,6 @@ func TestExternalSecretProvisioner_Provision(t *testing.T) {
 
 			// Verify data[0].remoteRef.key
 			if tt.wantRemoteKey != "" {
-				gotKey, _, _ := unstructured.NestedString(esObj.Object, "spec", "data", "0", "remoteRef", "key")
 				// NestedString doesn't work with array index — iterate data slice instead
 				dataSlice, _, _ := unstructured.NestedSlice(esObj.Object, "spec", "data")
 				if len(dataSlice) == 0 {
@@ -267,7 +266,7 @@ func TestExternalSecretProvisioner_Provision(t *testing.T) {
 				if !ok {
 					t.Fatal("spec.data[0].remoteRef is not a map")
 				}
-				if gotKey, _ = remoteRef["key"].(string); gotKey != tt.wantRemoteKey {
+				if gotKey, _ := remoteRef["key"].(string); gotKey != tt.wantRemoteKey {
 					t.Errorf("spec.data[0].remoteRef.key = %q, want %q", gotKey, tt.wantRemoteKey)
 				}
 				if tt.wantRemoteProperty != "" {
