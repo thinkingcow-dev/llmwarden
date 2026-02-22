@@ -344,11 +344,68 @@ NOT in MVP: ESO integration, workload identity, auto-rotation via provider APIs,
 | vs. | Why llmwarden is different |
 |-----|--------------------------|
 | Wiz AI-SPM | Wiz detects. llmwarden provisions and manages. Wiz: $200K+. llmwarden: open source. |
-| kagent | kagent runs agents. llmwarden serves any workload calling LLM APIs. |
+| kagent | kagent runs agents. llmwarden manages credentials FOR kagent (and any agent framework). Complementary. |
 | Envoy AI Gateway | Gateway proxies traffic. llmwarden manages credential lifecycle. Complementary. |
 | ESO alone | ESO is generic. llmwarden adds LLM-specific rotation, model scoping, unified abstraction. |
 | cert-manager | cert-manager: TLS certs. llmwarden: LLM credentials. Same philosophy, different domain. |
 | Manual K8s Secrets | No rotation, no audit, no namespace isolation, no model scoping. |
+
+## AI Agent & MCP Server Integration
+
+### The Credential Problem is Worse for Agents
+
+A standard workload calling an LLM API needs one credential: an API key. An AI agent is different:
+
+- **Multiple LLM providers**: A single agent might use Anthropic for reasoning, OpenAI for embeddings, and a local model for classification.
+- **Multiple MCP servers**: Each agent tool (GitHub, Slack, database) is an MCP server with its own auth — API keys, OAuth2 tokens, mTLS certificates.
+- **Dynamic composition**: Agents add and remove tools at runtime, meaning credential requirements change more often than traditional workloads.
+
+The result: an agent with 3 MCP servers and 2 LLM providers needs 5 separately-managed secrets, each with different rotation policies, different auth methods, and no unified audit trail.
+
+### How llmwarden Integrates with kagent
+
+[kagent](https://github.com/kagent-dev/kagent) is a Kubernetes-native agent framework (CNCF sandbox). Its `ModelConfig` CRD references a Kubernetes Secret by name:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Platform Team                                             │
+│  kubectl apply -f llmprovider-anthropic.yaml               │
+│         ↓                                                  │
+│  LLMProvider (cluster-scoped)                              │
+│  name: anthropic-production                                │
+│  auth.type: apiKey → secret in llmwarden-system            │
+└──────────────────────────┬─────────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────────┐
+│  Dev Team                                                  │
+│  kubectl apply -f llmaccess-agent.yaml (in kagent ns)      │
+│         ↓                                                  │
+│  LLMAccess (namespace-scoped, kagent namespace)            │
+│  secretName: kagent-anthropic                              │
+│         ↓                                                  │
+│  llmwarden operator provisions K8s Secret automatically    │
+│  name: kagent-anthropic, namespace: kagent                 │
+└──────────────────────────┬─────────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────────┐
+│  kagent                                                    │
+│  ModelConfig references: secret kagent-anthropic           │
+│  Agent uses ModelConfig → gets credentials transparently   │
+│         ↓                                                  │
+│  llmwarden rotates secret on schedule (no agent restart)   │
+└────────────────────────────────────────────────────────────┘
+```
+
+See the [kagent integration guide](../guides/kagent-integration.md) for a complete walk-through with working YAML.
+
+### Future: ToolProvider/ToolAccess for MCP Server Credentials
+
+The same credential lifecycle problem applies to MCP server auth. The Phase 6 roadmap extends llmwarden's model to tool credentials:
+
+- **ToolProvider** (cluster-scoped) — platform team declares available MCP servers with their auth config (API key, OAuth2, mTLS, basic auth).
+- **ToolAccess** (namespace-scoped) — dev team requests credentials for a specific MCP server, scoped to specific capabilities.
+
+This extends the same patterns (namespace isolation, rotation, audit, webhook injection) from LLM credentials to tool credentials. See the [ToolProvider/ToolAccess design doc](../design/tool-credential-management.md) for the full proposal.
 
 ## Security Architecture
 
@@ -483,3 +540,6 @@ llmwarden protects against the following threat vectors:
 - **Secrets encryption**: Integration with external KMS (AWS KMS, Azure Key Vault, GCP KMS)
 - **Anomaly detection**: ML-based detection of unusual access patterns
 - **Zero-trust networking**: Automatic service mesh policy generation based on LLMAccess
+- **ToolProvider/ToolAccess CRDs**: Extend from LLM credentials to AI tool credentials (MCP server auth, OAuth tokens for GitHub/Slack/DB tools). Same philosophy — declarative, lifecycle-managed, auditable. See [design doc](../design/tool-credential-management.md).
+- **kagent native integration**: Potential for kagent to support llmwarden as a first-class credential backend, eliminating manual secret creation entirely.
+- **MCP auth spec alignment**: As the MCP authorization specification stabilizes (currently evolving), align ToolProvider auth types with the standard.

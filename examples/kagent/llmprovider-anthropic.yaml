@@ -1,0 +1,23 @@
+apiVersion: llmwarden.io/v1alpha1
+kind: LLMProvider
+metadata:
+  name: anthropic-production
+spec:
+  provider: anthropic
+  auth:
+    type: apiKey
+    apiKey:
+      secretRef:
+        name: anthropic-master-key
+        namespace: llmwarden-system
+        key: api-key
+      rotation:
+        enabled: true
+        interval: 30d
+  allowedModels:
+    - "claude-opus-4-6"
+    - "claude-sonnet-4-6"
+    - "claude-haiku-4-5"
+  namespaceSelector:
+    matchLabels:
+      llmwarden.io/ai-enabled: "true"

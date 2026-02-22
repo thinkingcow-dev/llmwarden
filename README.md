@@ -2,7 +2,7 @@
 
 **cert-manager, but for LLM API credentials.**
 
-A Kubernetes operator that makes LLM provider access declarative, secretless where possible, and auditable by default.
+A Kubernetes operator that makes LLM and AI tool credential access declarative, secretless where possible, and auditable by default.
 
 ## The Problem
 
@@ -14,6 +14,7 @@ Team B → ESO pulls from Vault               ⚠️  key was manually created 6
 Team C → IRSA for Bedrock                   ⚠️  over-scoped to bedrock:*, took 3 weeks
 Team D → Azure Workload Identity            ⚠️  snowflake config, not reproducible
 Team E → API key in ConfigMap               ❌ plain text, no rotation
+Team F → kagent agent with 3 MCP servers    ❌ 4 manual secrets, zero rotation, scattered across namespaces
 ```
 
 Nobody has a unified, declarative way to say: **"this workload needs access to GPT-4o."**
@@ -75,6 +76,10 @@ llmwarden handles: credential provisioning, namespace isolation, model access co
 - **Status-driven** — `kubectl get llmaccess` shows credential health
 - **Auditable** — K8s events for every credential action
 
+## Works with AI Agent Frameworks
+
+llmwarden provisions Kubernetes Secrets that any K8s-native agent framework can consume. [kagent](https://github.com/kagent-dev/kagent) (CNCF sandbox) uses `secretKeyRef` in its `ModelConfig` CRD — llmwarden manages the lifecycle of that secret automatically. The same pattern works with OpenClaw, custom agent deployments, or any pod-based workload. See the [kagent integration guide](docs/guides/kagent-integration.md) for a complete walk-through.
+
 ### Roadmap
 
 - [ ] External Secrets Operator integration
@@ -82,6 +87,7 @@ llmwarden handles: credential provisioning, namespace isolation, model access co
 - [ ] Auto-rotation via provider admin APIs (OpenAI, Anthropic)
 - [ ] Kyverno policy generation
 - [ ] SPIRE integration for OIDC token exchange
+- [ ] ToolProvider/ToolAccess CRDs for MCP server and AI tool credential management
 
 ## Quick Start
 

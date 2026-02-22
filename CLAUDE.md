@@ -9,12 +9,13 @@ It solves the fragmentation problem: every team in a K8s cluster accesses LLM pr
 **What llmwarden is NOT:**
 - Not an LLM gateway/proxy (use Envoy AI Gateway, LiteLLM, etc. for that)
 - Not a security scanner (use Wiz AI-SPM, Kubescape, etc.)
-- Not an agent framework (use kagent, LangGraph, etc.)
+- Not an agent framework (use kagent, LangGraph, etc.) — but llmwarden manages credentials FOR agent frameworks
 
 **What llmwarden IS:**
 - A credential lifecycle operator for LLM provider access
 - A unified multi-cloud workload identity abstraction
 - A platform engineering tool that makes the secure path the easy path
+- The credential layer for AI agent runtimes (kagent, OpenClaw, custom agents)
 
 ## Architecture
 
@@ -24,6 +25,8 @@ It solves the fragmentation problem: every team in a K8s cluster accesses LLM pr
 LLMProvider (cluster-scoped)     — Platform team declares available LLM providers + auth config
 LLMAccess (namespace-scoped)     — Dev team requests access to a provider for their workload
 LLMAccessStatus                  — Operator reports credential state, rotation timestamps, health
+ToolProvider (cluster-scoped)    — [Future] Platform team declares available MCP servers / AI tools
+ToolAccess (namespace-scoped)    — [Future] Dev team requests tool credentials for agent workloads
 ```
 
 ### Controller Flow
@@ -193,10 +196,17 @@ llmwarden/
 - [ ] Rotation scheduler with jitter
 - [ ] Pre-rotation health check (validate new key before swapping)
 
-### Phase 5: Policy & Audit
+### Phase 5: Policy, Audit & Agent Ecosystem
 - [ ] Kyverno policy generation ("no hardcoded LLM keys")
 - [ ] `kubectl llmwarden audit` — inventory of all LLM access
 - [ ] Cost attribution labels/annotations
+- [ ] kagent integration testing (automated e2e with kagent CRDs)
+
+### Phase 6: ToolProvider/ToolAccess for MCP & AI Tools (Future)
+- [ ] ToolProvider CRD (cluster-scoped) — declares available MCP servers / AI tools + auth config
+- [ ] ToolAccess CRD (namespace-scoped) — requests tool credentials for agent workloads
+- [ ] OAuth2 credential flow support (GitHub, Slack, etc. MCP server auth)
+- [ ] MCP server discovery integration
 - [ ] SPIRE integration for OIDC token exchange (stretch)
 
 ## API Reference
@@ -236,3 +246,5 @@ helm install llmwarden charts/llmwarden -n llmwarden-system --create-namespace
 - External Secrets Operator: https://external-secrets.io/
 - OpenAI Admin API: https://platform.openai.com/docs/api-reference/administration
 - cert-manager architecture (inspiration): https://cert-manager.io/docs/concepts/
+- kagent (CNCF sandbox): https://github.com/kagent-dev/kagent
+- MCP specification: https://modelcontextprotocol.io/

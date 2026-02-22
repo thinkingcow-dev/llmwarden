@@ -1,0 +1,18 @@
+apiVersion: llmwarden.io/v1alpha1
+kind: LLMAccess
+metadata:
+  name: agent-anthropic
+  namespace: kagent
+spec:
+  providerRef:
+    name: anthropic-production
+  models:
+    - "claude-sonnet-4-6"
+  secretName: kagent-anthropic
+  workloadSelector:
+    matchLabels:
+      kagent.dev/agent: example-agent
+  injection:
+    env:
+      - name: ANTHROPIC_API_KEY
+        secretKey: apiKey

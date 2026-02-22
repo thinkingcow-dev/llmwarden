@@ -1,0 +1,14 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: example-agent
+  namespace: kagent
+  labels:
+    kagent.dev/agent: example-agent
+spec:
+  systemPrompt: |
+    You are a helpful assistant. You have access to reasoning capabilities
+    via Claude and can use GPT-4o for additional tasks.
+  modelConfigRef:
+    name: claude-sonnet
+  tools: []

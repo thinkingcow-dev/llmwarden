@@ -1,0 +1,23 @@
+apiVersion: llmwarden.io/v1alpha1
+kind: LLMProvider
+metadata:
+  name: openai-production
+spec:
+  provider: openai
+  auth:
+    type: apiKey
+    apiKey:
+      secretRef:
+        name: openai-master-key
+        namespace: llmwarden-system
+        key: api-key
+      rotation:
+        enabled: true
+        interval: 30d
+  allowedModels:
+    - "gpt-4o"
+    - "gpt-4o-mini"
+    - "text-embedding-3-large"
+  namespaceSelector:
+    matchLabels:
+      llmwarden.io/ai-enabled: "true"
