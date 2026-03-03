@@ -244,11 +244,11 @@ make test              # Unit + integration
 make test-e2e          # E2E with chainsaw
 
 # Build
-make docker-build IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
-make docker-push IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
+make docker-build IMG=ghcr.io/llmwarden/llmwarden:latest
+make docker-push IMG=ghcr.io/llmwarden/llmwarden:latest
 
 # Deploy
-make deploy IMG=ghcr.io/thinkingcow-dev/llmwarden:latest
+make deploy IMG=ghcr.io/llmwarden/llmwarden:latest
 
 # Helm
 helm install llmwarden charts/llmwarden -n llmwarden-system --create-namespace

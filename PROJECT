@@ -7,7 +7,7 @@ domain: llmwarden.io
 layout:
 - go.kubebuilder.io/v4
 projectName: llmwarden
-repo: github.com/tpbansal/llmwarden
+repo: github.com/llmwarden/llmwarden
 resources:
 - api:
     crdVersion: v1
@@ -16,7 +16,7 @@ resources:
   domain: llmwarden.io
   group: llmwarden
   kind: LLMProvider
-  path: github.com/tpbansal/llmwarden/api/v1alpha1
+  path: github.com/llmwarden/llmwarden/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -25,7 +25,7 @@ resources:
   domain: llmwarden.io
   group: llmwarden
   kind: LLMAccess
-  path: github.com/tpbansal/llmwarden/api/v1alpha1
+  path: github.com/llmwarden/llmwarden/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true

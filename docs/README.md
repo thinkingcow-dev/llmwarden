@@ -130,7 +130,7 @@ Detailed API documentation: [architecture.md - CRD Specifications](./architectur
 
 ```bash
 # Clone the repo
-git clone https://github.com/thinkingcow-dev/llmwarden.git
+git clone https://github.com/llmwarden/llmwarden.git
 cd llmwarden
 
 # Create kind cluster
@@ -307,8 +307,8 @@ Also review: [CLAUDE.md - Coding Standards](../CLAUDE.md#coding-standards)
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/thinkingcow-dev/llmwarden/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/thinkingcow-dev/llmwarden/discussions)
+- **Issues:** [GitHub Issues](https://github.com/llmwarden/llmwarden/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/llmwarden/llmwarden/discussions)
 
 ## License
 

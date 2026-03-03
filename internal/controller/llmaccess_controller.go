@@ -37,9 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
-	"github.com/thinkingcow-dev/llmwarden/internal/metrics"
-	"github.com/thinkingcow-dev/llmwarden/internal/provisioner"
+	llmwardenv1alpha1 "github.com/llmwarden/llmwarden/api/v1alpha1"
+	"github.com/llmwarden/llmwarden/internal/metrics"
+	"github.com/llmwarden/llmwarden/internal/provisioner"
 )
 
 const (

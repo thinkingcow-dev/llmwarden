@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
-	"github.com/thinkingcow-dev/llmwarden/internal/eso"
+	llmwardenv1alpha1 "github.com/llmwarden/llmwarden/api/v1alpha1"
+	"github.com/llmwarden/llmwarden/internal/eso"
 )
 
 // testProvider returns a minimal LLMProvider with externalSecret auth configured.

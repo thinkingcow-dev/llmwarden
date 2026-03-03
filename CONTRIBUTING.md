@@ -35,7 +35,7 @@ git commit --amend -s --no-edit
 
 ```bash
 # Clone
-git clone https://github.com/thinkingcow-dev/llmwarden.git
+git clone https://github.com/llmwarden/llmwarden.git
 cd llmwarden
 
 # Generate CRDs and deepcopy

@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
-	"github.com/thinkingcow-dev/llmwarden/internal/metrics"
+	llmwardenv1alpha1 "github.com/llmwarden/llmwarden/api/v1alpha1"
+	"github.com/llmwarden/llmwarden/internal/metrics"
 )
 
 // LLMProviderReconciler reconciles a LLMProvider object

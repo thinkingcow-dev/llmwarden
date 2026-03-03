@@ -35,7 +35,7 @@ The following table lists the configurable parameters of the llmwarden chart and
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `replicaCount` | Number of replicas for the controller | `1` |
-| `image.repository` | Image repository | `ghcr.io/tpbansal/llmwarden` |
+| `image.repository` | Image repository | `ghcr.io/llmwarden/llmwarden` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `image.tag` | Overrides the image tag | `""` (uses appVersion) |
 | `imagePullSecrets` | Image pull secrets | `[]` |
@@ -158,7 +158,7 @@ helm install llmwarden ./charts/llmwarden \
 replicaCount: 2
 
 image:
-  repository: ghcr.io/tpbansal/llmwarden
+  repository: ghcr.io/llmwarden/llmwarden
   tag: "v0.1.0"
 
 resources:

@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
-	"github.com/thinkingcow-dev/llmwarden/internal/eso"
+	llmwardenv1alpha1 "github.com/llmwarden/llmwarden/api/v1alpha1"
+	"github.com/llmwarden/llmwarden/internal/eso"
 )
 
 // ExternalSecretProvisioner implements the Provisioner interface for ESO-based authentication.

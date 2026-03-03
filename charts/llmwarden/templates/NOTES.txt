@@ -75,4 +75,4 @@ Then create an LLMAccess in your application namespace:
 For more information, visit:
 {{ .Chart.Home }}
 
-Documentation: https://github.com/tpbansal/llmwarden/tree/main/docs
+Documentation: https://github.com/llmwarden/llmwarden/tree/main/docs
