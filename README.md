@@ -155,7 +155,7 @@ llmwarden is a thin orchestration layer. It delegates to battle-tested CNCF proj
 ## Development
 
 ```bash
-# Prerequisites: Go 1.23+, kubectl, kind/minikube
+# Prerequisites: Go 1.25+, kubectl, kind/minikube
 
 # Generate code and manifests
 make generate manifests

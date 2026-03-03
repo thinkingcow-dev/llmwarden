@@ -165,7 +165,12 @@ func isValidEnvVarName(name string) bool {
 func (v *LLMAccessCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj *llmwardenv1alpha1.LLMAccess) (admission.Warnings, error) {
 	llmaccesslog.Info("Validation for LLMAccess upon update", "name", newObj.GetName())
 
-	// TODO(user): fill in your validation logic upon object update.
+	// providerRef is immutable: changing the provider would leave orphaned secrets and is
+	// semantically equivalent to deleting and recreating the LLMAccess. Require delete/recreate.
+	if oldObj.Spec.ProviderRef.Name != newObj.Spec.ProviderRef.Name {
+		return nil, fmt.Errorf("spec.providerRef.name is immutable: cannot change from %q to %q; delete and recreate the LLMAccess instead",
+			oldObj.Spec.ProviderRef.Name, newObj.Spec.ProviderRef.Name)
+	}
 
 	return nil, nil
 }

@@ -73,7 +73,7 @@ func (r *LLMProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Validate provider config and set Ready condition
 	condStatus, reason, message := r.validateProviderConfig(ctx, provider)
-	r.setCondition(provider, "Ready", condStatus, reason, message)
+	setCondition(&provider.Status.Conditions, provider.Generation, "Ready", condStatus, reason, message)
 
 	// Update LastCredentialCheck timestamp
 	now := metav1.Now()
@@ -190,31 +190,6 @@ func (r *LLMProviderReconciler) validateExternalSecretConfig(provider *llmwarden
 
 	return metav1.ConditionTrue, "ExternalSecretConfigured",
 		fmt.Sprintf("ExternalSecret configured: %s/%s → %s", cfg.Store.Kind, cfg.Store.Name, cfg.RemoteRef.Key)
-}
-
-// setCondition sets or updates a condition on the provider status.
-func (r *LLMProviderReconciler) setCondition(provider *llmwardenv1alpha1.LLMProvider, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	now := metav1.Now()
-	for i, cond := range provider.Status.Conditions {
-		if cond.Type == conditionType {
-			if cond.Status != status {
-				provider.Status.Conditions[i].LastTransitionTime = now
-			}
-			provider.Status.Conditions[i].Status = status
-			provider.Status.Conditions[i].Reason = reason
-			provider.Status.Conditions[i].Message = message
-			provider.Status.Conditions[i].ObservedGeneration = provider.Generation
-			return
-		}
-	}
-	provider.Status.Conditions = append(provider.Status.Conditions, metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		LastTransitionTime: now,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: provider.Generation,
-	})
 }
 
 // SetupWithManager sets up the controller with the Manager.

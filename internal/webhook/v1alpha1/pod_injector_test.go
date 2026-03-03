@@ -404,14 +404,14 @@ func TestPodInjector_Handle(t *testing.T) {
 				WithRuntimeObjects(objects...).
 				Build()
 
-			// Create injector
-			injector := &PodInjector{
-				Client: fakeClient,
-			}
-
 			// Create decoder
 			decoder := admission.NewDecoder(scheme)
-			_ = injector.InjectDecoder(decoder)
+
+			// Create injector
+			injector := &PodInjector{
+				Client:  fakeClient,
+				decoder: decoder,
+			}
 
 			// Marshal pod to raw bytes
 			podBytes, err := json.Marshal(tt.pod)

@@ -519,10 +519,9 @@ var _ = Describe("LLMAccess Controller", func() {
 	})
 })
 
-// randString generates a random string of length 5
-func randString(_ int) string {
+// randString generates a random lowercase alphanumeric string of the given length.
+func randString(length int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
-	const length = 5
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, length)
 	for i := range b {

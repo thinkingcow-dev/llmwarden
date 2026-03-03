@@ -61,26 +61,43 @@ var _ = Describe("LLMAccess Webhook", func() {
 	})
 
 	Context("When creating or updating LLMAccess under Validating Webhook", func() {
-		// TODO (user): Add logic for validating webhooks
-		// Example:
-		// It("Should deny creation if a required field is missing", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = ""
-		//     Expect(validator.ValidateCreate(ctx, obj)).Error().To(HaveOccurred())
-		// })
-		//
-		// It("Should admit creation if all required fields are present", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = "valid_value"
-		//     Expect(validator.ValidateCreate(ctx, obj)).To(BeNil())
-		// })
-		//
-		// It("Should validate updates correctly", func() {
-		//     By("simulating a valid update scenario")
-		//     oldObj.SomeRequiredField = "updated_value"
-		//     obj.SomeRequiredField = "updated_value"
-		//     Expect(validator.ValidateUpdate(ctx, oldObj, obj)).To(BeNil())
-		// })
+		It("Should deny creation when providerRef.name is empty", func() {
+			obj.Spec.ProviderRef.Name = ""
+			obj.Spec.SecretName = "my-secret"
+			obj.Spec.Injection.Env = []llmwardenv1alpha1.EnvVarMapping{
+				{Name: "OPENAI_API_KEY", SecretKey: "apiKey"},
+			}
+			_, err := validator.ValidateCreate(ctx, obj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("providerRef.name"))
+		})
+
+		It("Should admit creation when required fields are present", func() {
+			obj.Spec.ProviderRef.Name = "openai-prod"
+			obj.Spec.SecretName = "my-secret"
+			obj.Spec.Injection.Env = []llmwardenv1alpha1.EnvVarMapping{
+				{Name: "OPENAI_API_KEY", SecretKey: "apiKey"},
+			}
+			_, err := validator.ValidateCreate(ctx, obj)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should deny update when providerRef.name changes", func() {
+			oldObj.Spec.ProviderRef.Name = "openai-prod"
+			obj.Spec.ProviderRef.Name = "anthropic-prod"
+			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("immutable"))
+		})
+
+		It("Should admit update when providerRef.name is unchanged", func() {
+			oldObj.Spec.ProviderRef.Name = "openai-prod"
+			obj.Spec.ProviderRef.Name = "openai-prod"
+			// Change an allowed field
+			obj.Spec.SecretName = "new-secret-name"
+			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 })

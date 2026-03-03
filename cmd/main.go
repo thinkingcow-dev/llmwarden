@@ -199,6 +199,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMProvider")
 		os.Exit(1)
 	}
+	// Select the ESO adapter version. Default to v1 (ESO v0.17+).
+	// Set ESO_API_VERSION=v1beta1 if running against an older ESO installation.
+	esoAdapter := eso.Adapter(eso.NewV1Adapter())
+	if os.Getenv("ESO_API_VERSION") == "v1beta1" {
+		setupLog.Info("Using ESO v1beta1 adapter (set ESO_API_VERSION=v1 to use the current API)")
+		esoAdapter = eso.NewV1Beta1Adapter()
+	}
+
 	if err := (&controller.LLMAccessReconciler{
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
@@ -207,7 +215,7 @@ func main() {
 		ExternalSecretProvisioner: provisioner.NewExternalSecretProvisioner(
 			mgr.GetClient(),
 			mgr.GetScheme(),
-			eso.NewV1Beta1Adapter(),
+			esoAdapter,
 		),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LLMAccess")

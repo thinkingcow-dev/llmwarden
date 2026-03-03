@@ -242,9 +242,3 @@ func (i *PodInjector) hasVolumeMountConflict(container *corev1.Container, mountP
 	}
 	return false
 }
-
-// InjectDecoder injects the decoder.
-func (i *PodInjector) InjectDecoder(d admission.Decoder) error {
-	i.decoder = d
-	return nil
-}

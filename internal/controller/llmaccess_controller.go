@@ -33,7 +33,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	llmwardenv1alpha1 "github.com/thinkingcow-dev/llmwarden/api/v1alpha1"
 	"github.com/thinkingcow-dev/llmwarden/internal/metrics"
@@ -100,7 +102,19 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Handle deletion
 	if !llmAccess.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(llmAccess, llmAccessFinalizer) {
-			// Cleanup logic here if needed (e.g., revoke credentials)
+			// Fetch the provider to determine which provisioner to call for cleanup.
+			// The provider may already be deleted; if so, skip cleanup (owner references
+			// on the owned Secret/ExternalSecret will GC them via Kubernetes).
+			provider := &llmwardenv1alpha1.LLMProvider{}
+			if err := r.Get(ctx, types.NamespacedName{Name: llmAccess.Spec.ProviderRef.Name}, provider); err == nil {
+				if prov, err := r.selectProvisioner(provider.Spec.Auth.Type); err == nil {
+					if cleanupErr := prov.Cleanup(ctx, provider, llmAccess); cleanupErr != nil {
+						logger.Error(cleanupErr, "Failed to cleanup provisioner resources during deletion")
+						// Don't block deletion on cleanup failures for the ESO path;
+						// log and proceed so the finalizer can be removed.
+					}
+				}
+			}
 			controllerutil.RemoveFinalizer(llmAccess, llmAccessFinalizer)
 			if err := r.Update(ctx, llmAccess); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer: %w", err)
@@ -126,7 +140,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			logger.Error(err, "Referenced LLMProvider not found", "provider", llmAccess.Spec.ProviderRef.Name)
 			r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonProviderNotFound,
 				fmt.Sprintf("LLMProvider %s not found", llmAccess.Spec.ProviderRef.Name))
-			r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonProviderNotFound,
+			setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionFalse, ReasonProviderNotFound,
 				fmt.Sprintf("LLMProvider %s not found", llmAccess.Spec.ProviderRef.Name))
 			if err := r.Status().Update(ctx, llmAccess); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
@@ -141,7 +155,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		logger.Info("Namespace not allowed by provider", "namespace", llmAccess.Namespace, "provider", provider.Name)
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonNamespaceNotAllowed,
 			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
-		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonNamespaceNotAllowed,
+		setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionFalse, ReasonNamespaceNotAllowed,
 			fmt.Sprintf("Namespace %s is not allowed by LLMProvider %s", llmAccess.Namespace, provider.Name))
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
 			metrics.ReconciliationDuration.WithLabelValues("llmaccess", "error").Observe(time.Since(startTime).Seconds())
@@ -157,7 +171,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.validateModels(llmAccess.Spec.Models, provider); err != nil {
 		logger.Error(err, "Model validation failed")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonModelNotAllowed, err.Error())
-		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonModelNotAllowed, err.Error())
+		setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionFalse, ReasonModelNotAllowed, err.Error())
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 		}
@@ -169,7 +183,7 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	prov, err := r.selectProvisioner(provider.Spec.Auth.Type)
 	if err != nil {
 		logger.Info("Auth type not supported", "authType", provider.Spec.Auth.Type)
-		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonAuthTypeNotSupported, err.Error())
+		setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionFalse, ReasonAuthTypeNotSupported, err.Error())
 		if statusErr := r.Status().Update(ctx, llmAccess); statusErr != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", statusErr)
 		}
@@ -182,9 +196,9 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		logger.Error(err, "Failed to provision secret")
 		r.Recorder.Event(llmAccess, corev1.EventTypeWarning, ReasonSecretUpdateFailed,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
-		r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionFalse, ReasonReconciliationError,
+		setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionFalse, ReasonReconciliationError,
 			fmt.Sprintf("Failed to provision credentials: %v", err))
-		r.setCondition(llmAccess, ConditionTypeCredentialProvisioned, metav1.ConditionFalse, ReasonSecretUpdateFailed, err.Error())
+		setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeCredentialProvisioned, metav1.ConditionFalse, ReasonSecretUpdateFailed, err.Error())
 		if err := r.Status().Update(ctx, llmAccess); err != nil {
 			metrics.ReconciliationDuration.WithLabelValues("llmaccess", "error").Observe(time.Since(startTime).Seconds())
 			return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
@@ -212,9 +226,9 @@ func (r *LLMAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		llmAccess.Status.NextRotation = &nextRotation
 	}
 
-	r.setCondition(llmAccess, ConditionTypeCredentialProvisioned, metav1.ConditionTrue, ReasonSecretCreated,
+	setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeCredentialProvisioned, metav1.ConditionTrue, ReasonSecretCreated,
 		"Secret created/updated successfully")
-	r.setCondition(llmAccess, ConditionTypeReady, metav1.ConditionTrue, ReasonCredentialProvisioned,
+	setCondition(&llmAccess.Status.Conditions, llmAccess.Generation, ConditionTypeReady, metav1.ConditionTrue, ReasonCredentialProvisioned,
 		"Credentials provisioned and ready")
 
 	if err := r.Status().Update(ctx, llmAccess); err != nil {
@@ -365,9 +379,9 @@ func parseDuration(s string) (time.Duration, error) {
 			if err != nil {
 				return 0, fmt.Errorf("invalid duration value: %w", err)
 			}
-			// Prevent integer overflow
-			if value < 0 || value > 365 {
-				return 0, fmt.Errorf("duration value out of range (0-365): %d", value)
+			// Prevent integer overflow and reject non-positive intervals ("0d" is ambiguous).
+			if value <= 0 || value > 365 {
+				return 0, fmt.Errorf("duration value out of range (1-365): %d", value)
 			}
 			unit = s[i:]
 			break
@@ -398,41 +412,34 @@ func parseDuration(s string) (time.Duration, error) {
 	return duration, nil
 }
 
-// setCondition sets a condition on the LLMAccess status
-func (r *LLMAccessReconciler) setCondition(llmAccess *llmwardenv1alpha1.LLMAccess, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	now := metav1.Now()
-
-	// Find existing condition
-	for i, condition := range llmAccess.Status.Conditions {
-		if condition.Type == conditionType {
-			// Update existing condition only if status changed
-			if condition.Status != status {
-				llmAccess.Status.Conditions[i].Status = status
-				llmAccess.Status.Conditions[i].LastTransitionTime = now
-			}
-			llmAccess.Status.Conditions[i].Reason = reason
-			llmAccess.Status.Conditions[i].Message = message
-			llmAccess.Status.Conditions[i].ObservedGeneration = llmAccess.Generation
-			return
-		}
-	}
-
-	// Add new condition
-	llmAccess.Status.Conditions = append(llmAccess.Status.Conditions, metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		LastTransitionTime: now,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: llmAccess.Generation,
-	})
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *LLMAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Watch LLMProvider changes and enqueue all LLMAccess resources that reference the changed provider.
+	// This ensures that when a provider's master secret rotates or its config changes, all downstream
+	// LLMAccess resources reconcile immediately rather than waiting for their next scheduled requeue.
+	mapProviderToAccesses := func(ctx context.Context, obj client.Object) []reconcile.Request {
+		llmAccessList := &llmwardenv1alpha1.LLMAccessList{}
+		if err := mgr.GetClient().List(ctx, llmAccessList); err != nil {
+			return nil
+		}
+		var reqs []reconcile.Request
+		for _, access := range llmAccessList.Items {
+			if access.Spec.ProviderRef.Name == obj.GetName() {
+				reqs = append(reqs, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      access.Name,
+						Namespace: access.Namespace,
+					},
+				})
+			}
+		}
+		return reqs
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&llmwardenv1alpha1.LLMAccess{}).
 		Owns(&corev1.Secret{}).
+		Watches(&llmwardenv1alpha1.LLMProvider{}, handler.EnqueueRequestsFromMapFunc(mapProviderToAccesses)).
 		Named("llmaccess").
 		Complete(r)
 }

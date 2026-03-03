@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -152,13 +154,13 @@ func (p *ApiKeyProvisioner) Provision(ctx context.Context, provider *llmwardenv1
 		"targetSecret": fmt.Sprintf("%s/%s", access.Namespace, access.Spec.SecretName),
 	}
 
-	// Determine if rotation is needed
+	// Determine if rotation is needed based on the configured interval.
 	needsRotation := false
 	var expiresAt *time.Time
 
 	if provider.Spec.Auth.APIKey.Rotation != nil && provider.Spec.Auth.APIKey.Rotation.Enabled {
-		// Check if rotation interval has passed
-		if targetSecret.CreationTimestamp.Time.Add(24 * time.Hour).Before(time.Now()) {
+		rotationInterval := parseRotationDuration(provider.Spec.Auth.APIKey.Rotation.Interval, 24*time.Hour)
+		if targetSecret.CreationTimestamp.Time.Add(rotationInterval).Before(time.Now()) {
 			needsRotation = true
 		}
 	}
@@ -245,8 +247,10 @@ func (p *ApiKeyProvisioner) HealthCheck(ctx context.Context, provider *llmwarden
 	result.Metadata["secretAge"] = age.String()
 
 	if provider.Spec.Auth.APIKey != nil && provider.Spec.Auth.APIKey.Rotation != nil && provider.Spec.Auth.APIKey.Rotation.Enabled {
-		// Warn if secret is getting old
-		if age > 25*24*time.Hour { // 25 days if rotation is 30d
+		rotationInterval := parseRotationDuration(provider.Spec.Auth.APIKey.Rotation.Interval, 30*24*time.Hour)
+		// Warn when the secret has consumed more than 5/6 of the rotation interval.
+		warningThreshold := rotationInterval * 5 / 6
+		if age > warningThreshold {
 			result.Warnings = append(result.Warnings, "Secret is nearing rotation interval")
 		}
 	}
@@ -254,4 +258,25 @@ func (p *ApiKeyProvisioner) HealthCheck(ctx context.Context, provider *llmwarden
 	result.Healthy = true
 	result.Message = "Secret exists and contains valid API key"
 	return result, nil
+}
+
+// parseRotationDuration parses a rotation interval string supporting d/h/m suffixes.
+// Returns defaultDur when the string is empty or cannot be parsed.
+func parseRotationDuration(s string, defaultDur time.Duration) time.Duration {
+	if s == "" {
+		return defaultDur
+	}
+	// Handle 'd' suffix (days) which Go's time.ParseDuration does not support.
+	if strings.HasSuffix(s, "d") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err == nil && n > 0 {
+			return time.Duration(n) * 24 * time.Hour
+		}
+		return defaultDur
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return defaultDur
+	}
+	return d
 }
