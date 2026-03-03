@@ -337,7 +337,7 @@ To ship something useful fast:
 6. **Helm chart** for installation
 7. **envtest-based integration tests**
 
-NOT in MVP: ESO integration, workload identity, auto-rotation via provider APIs, Kyverno policies.
+NOT in Phase 1 MVP: ESO integration (added in Phase 2 ✅), workload identity, auto-rotation via provider APIs, Kyverno policies.
 
 ## Competitive Positioning
 
@@ -504,13 +504,13 @@ llmwarden protects against the following threat vectors:
 - Identify affected workloads: `kubectl get pods -l llmwarden.io/injected-providers=<provider>`
 - Forensics: check LLMAccess status conditions for last rotation timestamps
 
-### Known Limitations (MVP)
+### Known Limitations (current)
 
-- **No secret encryption at rest**: Relies on Kubernetes cluster configuration (enable encryption at rest on etcd)
-- **No external KMS integration**: Secrets stored in etcd, not externalized (use ESO integration in Phase 2)
+- **No secret encryption at rest** (apiKey auth type): Relies on Kubernetes cluster configuration (enable encryption at rest on etcd). Use the `externalSecret` auth type with an external KMS-backed store (Vault, AWS Secrets Manager, etc.) to avoid storing secrets in etcd.
 - **No automatic key revocation**: Rotation creates new keys but doesn't revoke old ones (Phase 4 feature)
 - **No rate limiting enforcement**: RateLimit is informational only, not enforced by operator
 - **No audit log export**: Events stored in Kubernetes only, no SIEM integration
+- **No workload identity support yet**: AWS IRSA, Azure Workload Identity, and GCP WIF provisioners are Phase 3 (not yet implemented)
 
 ### Compliance Considerations
 

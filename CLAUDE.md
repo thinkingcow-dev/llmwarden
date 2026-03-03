@@ -65,8 +65,10 @@ LLMAccess created
 ```
 llmwarden/
 ├── CLAUDE.md                    # This file
+├── AGENTS.md                    # Agent-oriented project context
+├── CONTRIBUTING.md
 ├── README.md
-├── LICENSE                      # Apache 2.0
+├── LICENSE.txt                  # Apache 2.0
 ├── Makefile
 ├── Dockerfile
 ├── go.mod / go.sum
@@ -82,23 +84,26 @@ llmwarden/
 ├── internal/
 │   ├── controller/
 │   │   ├── llmprovider_controller.go
+│   │   ├── llmprovider_controller_test.go
 │   │   ├── llmaccess_controller.go
-│   │   └── llmaccess_controller_test.go
+│   │   ├── llmaccess_controller_test.go
+│   │   └── suite_test.go
+│   ├── eso/                      # ESO API abstraction layer
+│   │   ├── adapter.go            # Adapter interface + internal types
+│   │   └── v1beta1.go            # ESO v1beta1 concrete adapter
 │   ├── provisioner/              # Auth strategy implementations
-│   │   ├── interface.go          # Provisioner interface
-│   │   ├── externalsecret.go     # ESO integration
-│   │   ├── workloadidentity.go   # Cloud WI abstraction
-│   │   ├── apikey.go             # Direct secret + rotation
-│   │   └── provisioner_test.go
+│   │   ├── interface.go          # Provisioner interface + result types
+│   │   ├── apikey.go             # Direct K8s Secret provisioner
+│   │   ├── apikey_test.go
+│   │   ├── externalsecret.go     # ESO ExternalSecret provisioner
+│   │   └── externalsecret_test.go
 │   ├── webhook/
-│   │   ├── injector.go           # Mutating webhook for env injection
-│   │   └── validator.go          # Validating webhook for LLMAccess
-│   ├── rotation/
-│   │   ├── manager.go            # Rotation scheduler
-│   │   └── providers/            # Provider-specific rotation
-│   │       ├── openai.go
-│   │       ├── anthropic.go
-│   │       └── aws.go
+│   │   └── v1alpha1/
+│   │       ├── pod_injector.go       # Mutating webhook: injects env vars into pods
+│   │       ├── pod_injector_test.go
+│   │       ├── llmaccess_webhook.go  # Validating webhook for LLMAccess
+│   │       ├── llmaccess_webhook_test.go
+│   │       └── webhook_suite_test.go
 │   └── metrics/
 │       └── metrics.go            # Prometheus metrics
 ├── config/
@@ -109,16 +114,26 @@ llmwarden/
 │   ├── samples/                  # Example CRs
 │   └── default/                  # Kustomize default overlay
 ├── charts/
-│   └── llmwarden/                 # Helm chart
+│   └── llmwarden/                # Helm chart
 │       ├── Chart.yaml
 │       ├── values.yaml
 │       └── templates/
 ├── docs/
+│   ├── README.md                 # Docs index
 │   ├── architecture.md
-│   └── getting-started.md
+│   ├── getting-started.md
+│   ├── dev-cheatsheet.md
+│   ├── local-development.md
+│   ├── guides/
+│   │   └── kagent-integration.md
+│   └── design/
+│       └── tool-credential-management.md
+├── examples/
+│   ├── kagent/                   # Working kagent integration examples
+│   └── local-dev/                # Local development environment setup
 └── test/
     ├── e2e/
-    └── integration/
+    └── utils/
 ```
 
 ## Coding Standards
@@ -179,10 +194,10 @@ llmwarden/
 - [x] Unit + integration tests with envtest
 - [x] README with getting-started guide
 
-### Phase 2: ESO Integration
-- [ ] ExternalSecret provisioner (creates ESO ExternalSecret CRs)
-- [ ] SecretStore/ClusterSecretStore reference support
-- [ ] Rotation policy passthrough to ESO
+### Phase 2: ESO Integration ✅
+- [x] ExternalSecret provisioner (creates ESO ExternalSecret CRs)
+- [x] SecretStore/ClusterSecretStore reference support
+- [x] Rotation policy passthrough to ESO
 
 ### Phase 3: Workload Identity Abstraction
 - [ ] AWS IRSA provisioner (annotate SA, create IAM role binding)

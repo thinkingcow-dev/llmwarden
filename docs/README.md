@@ -43,9 +43,13 @@ docs/
 ├── local-development.md         # Local kind cluster setup with sample app
 ├── dev-cheatsheet.md            # Quick reference commands
 ├── architecture.md              # Deep technical documentation
-└── claude-code-quickstart.md    # AI-assisted development guide
+├── guides/
+│   └── kagent-integration.md   # kagent credential lifecycle guide
+└── design/
+    └── tool-credential-management.md  # Phase 6 ToolProvider/ToolAccess design
 
 examples/
+├── kagent/                      # kagent integration examples (LLMProvider, LLMAccess, ModelConfig)
 └── local-dev/
     ├── README.md                # Local development example overview
     ├── llmprovider.yaml         # Sample LLMProvider
@@ -308,4 +312,4 @@ Also review: [CLAUDE.md - Coding Standards](../CLAUDE.md#coding-standards)
 
 ## License
 
-Apache License 2.0 - See [LICENSE](../LICENSE)
+Apache License 2.0 - See [LICENSE](../LICENSE.txt)

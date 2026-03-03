@@ -314,7 +314,7 @@ ToolProvider/ToolAccess deliberately mirrors the LLMProvider/LLMAccess design:
 
 **Shared infrastructure (Phase 6 reuse):**
 - The `Provisioner` interface defined in `internal/provisioner/interface.go` is used unchanged.
-- The mutating webhook in `internal/webhook/injector.go` is extended to handle `ToolAccess` resources alongside `LLMAccess`.
+- The mutating webhook in `internal/webhook/v1alpha1/pod_injector.go` is extended to handle `ToolAccess` resources alongside `LLMAccess`.
 - The same status condition types (`Ready`, `CredentialProvisioned`, `RotationDue`, `Error`) apply.
 - RBAC model is identical: cluster-scoped declaration, namespace-scoped request.
 
