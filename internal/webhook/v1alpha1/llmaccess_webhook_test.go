@@ -35,7 +35,7 @@ var _ = Describe("LLMAccess Webhook", func() {
 	BeforeEach(func() {
 		obj = &llmwardenv1alpha1.LLMAccess{}
 		oldObj = &llmwardenv1alpha1.LLMAccess{}
-		validator = LLMAccessCustomValidator{}
+		validator = LLMAccessCustomValidator{Client: k8sClient}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
 		defaulter = LLMAccessCustomDefaulter{}
 		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")

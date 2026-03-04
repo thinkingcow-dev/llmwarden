@@ -281,13 +281,28 @@ llmwarden_webhook_injections_total{namespace}                    — Webhook inj
 
 ## RBAC Model
 
+### Privilege Model: Why Cluster-Wide Secret Access is Required
+
+The llmwarden operator's ClusterRole grants **full `Secrets` access across all namespaces** (create, get, list, watch, update, patch, delete). This is a deliberate architectural necessity, not an oversight.
+
+**Why it is necessary:** llmwarden copies credential material from a central provider namespace (typically `llmwarden-system`, where the master API key secret lives) into individual workload namespaces. This cross-namespace secret copying is the core value proposition — workloads never need direct access to the master secret. Without cluster-wide `Secrets` permission, the operator cannot read source secrets or create destination secrets across namespace boundaries.
+
+This privilege model is analogous to cert-manager, which also requires cluster-wide secret access to store TLS certificates in arbitrary namespaces, and is well-understood by Kubernetes security reviewers.
+
+**Mitigations to apply in production:**
+
+1. **Deploy in a dedicated namespace** — Run the operator in `llmwarden-system`. Use `NetworkPolicy` and `PodSecurityAdmission` to isolate the namespace.
+2. **Audit the ClusterRoleBinding** — The binding subject must be only the operator's `ServiceAccount`. Verify with `kubectl get clusterrolebindings -o yaml | grep -A5 llmwarden`.
+3. **Use `namespaceSelector` on every LLMProvider** — This limits which namespaces can create `LLMAccess` resources for a given provider, constraining the blast radius of any compromised credential.
+4. **Enable Kubernetes audit logging** — All secret access by the operator is recorded at the API server level and can be shipped to a SIEM.
+5. **Enable encryption at rest** — Configure `EncryptionConfiguration` on your cluster to encrypt the `secrets` resource type in etcd, so copied credentials are not stored in plaintext.
+
 ### Operator ServiceAccount needs:
-- Secrets: create, get, list, watch, update, delete (in all namespaces)
-- ServiceAccounts: get, list, update (for workload identity annotations)
+- Secrets: create, get, list, watch, update, delete (cluster-wide — see privilege model above)
 - ExternalSecrets (external-secrets.io): create, get, list, watch, update, delete
 - LLMProviders, LLMAccess: get, list, watch, update/status
+- Namespaces: get, list, watch (for namespace selector evaluation)
 - Events: create, patch
-- Pods: get, list (for webhook)
 
 ### For users (RBAC examples):
 ```yaml

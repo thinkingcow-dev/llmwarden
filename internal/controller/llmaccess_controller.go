@@ -412,26 +412,47 @@ func parseDuration(s string) (time.Duration, error) {
 	return duration, nil
 }
 
+// providerRefNameField is the field index key for LLMAccess.spec.providerRef.name.
+const providerRefNameField = ".spec.providerRef.name"
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *LLMAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Watch LLMProvider changes and enqueue all LLMAccess resources that reference the changed provider.
-	// This ensures that when a provider's master secret rotates or its config changes, all downstream
-	// LLMAccess resources reconcile immediately rather than waiting for their next scheduled requeue.
+	// Register a field index on spec.providerRef.name so that mapProviderToAccesses can
+	// use a targeted List (client.MatchingFields) instead of listing all LLMAccess resources
+	// cluster-wide. Without this index, every LLMProvider change triggers an O(N) scan of all
+	// LLMAccess objects across all namespaces, which does not scale.
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&llmwardenv1alpha1.LLMAccess{},
+		providerRefNameField,
+		func(obj client.Object) []string {
+			access, ok := obj.(*llmwardenv1alpha1.LLMAccess)
+			if !ok {
+				return nil
+			}
+			return []string{access.Spec.ProviderRef.Name}
+		},
+	); err != nil {
+		return fmt.Errorf("setting up providerRef.name field index: %w", err)
+	}
+
+	// Watch LLMProvider changes and enqueue only LLMAccess resources that reference the changed
+	// provider. The field index makes this lookup O(matches) rather than O(total LLMAccess).
 	mapProviderToAccesses := func(ctx context.Context, obj client.Object) []reconcile.Request {
 		llmAccessList := &llmwardenv1alpha1.LLMAccessList{}
-		if err := mgr.GetClient().List(ctx, llmAccessList); err != nil {
+		if err := mgr.GetClient().List(ctx, llmAccessList,
+			client.MatchingFields{providerRefNameField: obj.GetName()},
+		); err != nil {
 			return nil
 		}
-		var reqs []reconcile.Request
+		reqs := make([]reconcile.Request, 0, len(llmAccessList.Items))
 		for _, access := range llmAccessList.Items {
-			if access.Spec.ProviderRef.Name == obj.GetName() {
-				reqs = append(reqs, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      access.Name,
-						Namespace: access.Namespace,
-					},
-				})
-			}
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      access.Name,
+					Namespace: access.Namespace,
+				},
+			})
 		}
 		return reqs
 	}

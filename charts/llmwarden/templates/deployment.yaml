@@ -82,8 +82,10 @@ spec:
           {{- toYaml .Values.readinessProbe | nindent 10 }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-        {{- with .Values.env }}
         env:
+        - name: ESO_API_VERSION
+          value: {{ .Values.externalSecrets.apiVersion | quote }}
+        {{- with .Values.env }}
           {{- toYaml . | nindent 10 }}
         {{- end }}
         {{- with .Values.envFrom }}

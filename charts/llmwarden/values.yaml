@@ -200,6 +200,9 @@ leaderElection:
 externalSecrets:
   # -- Watch for ExternalSecret resources
   enabled: false
+  # -- ESO API version to use. "v1" for ESO v0.17+ (default). "v1beta1" for older installations.
+  # This sets the ESO_API_VERSION environment variable on the controller.
+  apiVersion: "v1"
 
 # Logging configuration
 logging:

@@ -20,7 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -34,7 +38,7 @@ var llmaccesslog = logf.Log.WithName("llmaccess-resource")
 // SetupLLMAccessWebhookWithManager registers the webhook for LLMAccess in the manager.
 func SetupLLMAccessWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &llmwardenv1alpha1.LLMAccess{}).
-		WithValidator(&LLMAccessCustomValidator{}).
+		WithValidator(&LLMAccessCustomValidator{Client: mgr.GetClient()}).
 		WithDefaulter(&LLMAccessCustomDefaulter{}).
 		Complete()
 }
@@ -87,11 +91,11 @@ func (d *LLMAccessCustomDefaulter) Default(_ context.Context, obj *llmwardenv1al
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type LLMAccessCustomValidator struct {
-	// TODO(user): Add more fields as needed for validation
+	Client client.Client
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type LLMAccess.
-func (v *LLMAccessCustomValidator) ValidateCreate(_ context.Context, obj *llmwardenv1alpha1.LLMAccess) (admission.Warnings, error) {
+func (v *LLMAccessCustomValidator) ValidateCreate(ctx context.Context, obj *llmwardenv1alpha1.LLMAccess) (admission.Warnings, error) {
 	llmaccesslog.Info("Validation for LLMAccess upon creation", "name", obj.GetName())
 
 	var warnings admission.Warnings
@@ -136,6 +140,29 @@ func (v *LLMAccessCustomValidator) ValidateCreate(_ context.Context, obj *llmwar
 		}
 		if obj.Spec.Injection.Volume.MountPath[0] != '/' {
 			return warnings, fmt.Errorf("spec.injection.volume.mountPath must be an absolute path")
+		}
+	}
+
+	// Reject if a secret with spec.secretName already exists in the namespace but is
+	// not managed by llmwarden. Allowing CreateOrUpdate to overwrite an unmanaged secret
+	// (e.g. a database password) would silently destroy data in shared namespaces.
+	if v.Client != nil && obj.Namespace != "" {
+		existing := &corev1.Secret{}
+		err := v.Client.Get(ctx, types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Spec.SecretName,
+		}, existing)
+		if err == nil {
+			// Secret exists — check for the managed-by label
+			if existing.Labels["llmwarden.io/managed-by"] != "llmwarden" {
+				return warnings, fmt.Errorf(
+					"secret %q already exists in namespace %q and is not managed by llmwarden; "+
+						"choose a different spec.secretName or remove the existing secret first",
+					obj.Spec.SecretName, obj.Namespace,
+				)
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return warnings, fmt.Errorf("checking for existing secret %q: %w", obj.Spec.SecretName, err)
 		}
 	}
 
